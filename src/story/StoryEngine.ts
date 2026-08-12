@@ -1,50 +1,69 @@
 import type * as THREE from 'three'
 import type { Game } from '../core/Game'
+import type { Mood } from '../core/Mood'
 import type { FollowCamera } from '../camera/FollowCamera'
 import type { CinematicCamera, CinematicPreset } from '../camera/CinematicCamera'
 import type { ChoicePanel } from '../dialogue/ChoicePanel'
 import type { SophieBubble } from '../dialogue/SophieBubble'
+import type { TapCue } from '../dialogue/TapCue'
+import type { InteractionSystem } from '../interaction/InteractionSystem'
+import type { BrunoView } from '../interaction/BrunoView'
 import { iconFor, labelFromId } from '../dialogue/icons'
-import type { CinematicScene, ChoiceScene, StoryMission, StoryScene } from './types'
+import type {
+  ChoiceScene,
+  CinematicChoiceScene,
+  CinematicScene,
+  EndMenuScene,
+  MinigameScene,
+  StoryAction,
+  StoryChoice,
+  StoryMission,
+  StoryScene,
+} from './types'
 
 export interface StoryActors {
   /** Actor id (as used in JSON) → scene object. */
   resolve: (actorId: string) => THREE.Object3D | null
 }
 
-/** Applied to Bruno's placeholder as his state warms up (grey-phase stub
- *  for pose/animation changes — cold and closed → warmer and open). */
-const BRUNO_STATE_TINT: Record<string, number> = {
-  withdrawn: 0x6f94c4,
-  noticed: 0x769bcb,
-  named: 0x7fa8d9,
-  accepted: 0x8ab3e0,
-  trying: 0x95bde6,
-  wobble: 0x8ab3e0,
-  connected: 0xa3cbef,
+export interface StoryEngineDeps {
+  game: Game
+  followCamera: FollowCamera
+  cinematicCamera: CinematicCamera
+  choicePanel: ChoicePanel
+  bubble: SophieBubble
+  tapCue: TapCue
+  interaction: InteractionSystem
+  brunoView: BrunoView
+  mood: Mood
+  actors: StoryActors
 }
 
+/** Minigame option id → world interactable id. */
+const MINIGAME_PROP: Record<string, string> = {
+  roll_ball: 'ball',
+  place_block: 'blocks',
+  draw_chalk: 'chalk',
+}
 
 /**
- * Drives the mission from story JSON. Content (lines, choices, branching)
- * lives ONLY in the JSON — swapping in the full 8-scene file must require
- * zero code changes here.
+ * Drives the full mission from story JSON. Content (lines, choices,
+ * branching, safety thresholds) lives ONLY in the JSON — swapping the file
+ * requires zero code changes here.
  */
 export class StoryEngine {
-  private mission: StoryMission
+  private readonly mission: StoryMission
   private active = false
-  /** Bumped on soft-branch jumps so stale scene continuations cancel. */
+  /** Bumped on soft-branch jumps / restarts so stale continuations cancel. */
   private generation = 0
-  /** Called when a choice is picked; SafetyLayer listens for redirects. */
-  onChoice: ((choiceId: string, redirect: boolean) => void) | null = null
+  /** Per-scene count of gentle redirects (drives simplify_after_misses). */
+  private missCounts = new Map<string, number>()
+  private minigameTimer: number | null = null
+  /** Called when a choice is picked; SafetyLayer listens for avoidance. */
+  onChoice: ((choiceId: string, redirect: boolean, avoidant: boolean) => void) | null = null
 
   constructor(
-    private readonly game: Game,
-    private readonly followCamera: FollowCamera,
-    private readonly cinematicCamera: CinematicCamera,
-    private readonly choicePanel: ChoicePanel,
-    private readonly bubble: SophieBubble,
-    private readonly actors: StoryActors,
+    private readonly deps: StoryEngineDeps,
     mission: StoryMission,
   ) {
     this.mission = mission
@@ -61,22 +80,49 @@ export class StoryEngine {
   start(): void {
     if (this.active) return
     this.active = true
-    // Invalidate any continuation still pending from a previous run
-    // (e.g. the final line's bubble timer when Bruno is tapped again).
-    this.generation++
-    this.bubble.hideNow()
-    console.log(`[Story] mission "${this.mission.mission}" started`)
-    this.runScene(this.mission.scenes[0].id)
+    this.beginRun()
+  }
+
+  /** end_menu "Play again" — fresh run without leaving the mission. */
+  restart(): void {
+    if (!this.active) return
+    console.log('[Story] restart')
+    this.beginRun()
   }
 
   /** SafetyLayer jumps here after repeated avoidant choices. */
   jumpTo(sceneId: string): void {
     if (!this.active) return
     console.log(`[Story] soft branch -> ${sceneId}`)
-    this.generation++
-    this.choicePanel.hide()
-    this.bubble.hideNow()
+    this.invalidatePending()
     this.runScene(sceneId)
+  }
+
+  private beginRun(): void {
+    this.invalidatePending()
+    this.missCounts.clear()
+    const initialState = this.mission.actors?.bruno?.initial_state ?? 'withdrawn'
+    this.deps.brunoView.setState(initialState)
+    console.log(`[Story] mission "${this.mission.mission}" started`)
+    this.runScene(this.entrySceneId())
+  }
+
+  /** Cancel pending continuations (bubbles, timers, cues, minigame). */
+  private invalidatePending(): void {
+    this.generation++
+    this.deps.choicePanel.hide()
+    this.deps.bubble.hideNow()
+    this.deps.tapCue.hide()
+    this.deps.interaction.overrideActivate = null
+    this.deps.interaction.setHint(null)
+    if (this.minigameTimer !== null) {
+      window.clearTimeout(this.minigameTimer)
+      this.minigameTimer = null
+    }
+  }
+
+  private entrySceneId(): string {
+    return this.mission.entry ?? this.mission.scenes[0].id
   }
 
   private findScene(id: string): StoryScene | null {
@@ -91,127 +137,341 @@ export class StoryEngine {
       return this.finish()
     }
     console.log(`[Story] scene: ${scene.id} (${scene.type})`)
-    if (scene.type === 'choice') this.runChoice(scene)
-    else this.runCinematic(scene)
+    this.deps.mood.apply(scene.mood)
+    if (scene.bruno_state) this.deps.brunoView.setState(scene.bruno_state)
+
+    switch (scene.type) {
+      case 'cinematic':
+        return this.runCinematic(scene)
+      case 'choice':
+        return this.runChoice(scene, scene.setup_actions)
+      case 'cinematic_choice':
+        return this.runChoice(scene, scene.intro_actions)
+      case 'minigame':
+        return this.runMinigame(scene)
+      case 'end_menu':
+        return this.runEndMenu(scene)
+    }
   }
 
-  private runChoice(scene: ChoiceScene): void {
-    this.game.states.transition('CHOICE')
-    // Hand the camera back to the follow rig; its damped lerp eases the
-    // view over from wherever the last shot left it — no cuts.
-    this.cinematicCamera.stop()
-    this.followCamera.setEnabled(true)
-    this.applyChoiceCamera(scene.camera)
-    this.choicePanel.show(
+  // --- Cinematic scenes -------------------------------------------------
+
+  private runCinematic(scene: CinematicScene): void {
+    this.deps.game.states.transition('CINEMATIC')
+    const gen = this.generation
+    this.deps.followCamera.setEnabled(false)
+    this.deps.cinematicCamera.play(this.parsePreset(scene.camera)).then(() => {
+      if (gen !== this.generation) return
+      this.playActions(scene.actions, gen, () => {
+        if (scene.advance?.on === 'tap_cue') {
+          // Wait calmly (no timer) for a tap on the pulsing cue.
+          const cueTarget = this.resolveCueTarget(scene.advance.cue_targets)
+          this.deps.tapCue.show(cueTarget, () => {
+            if (gen === this.generation) this.runScene(scene.next)
+          })
+        } else {
+          this.runScene(scene.next)
+        }
+      })
+    })
+  }
+
+  private resolveCueTarget(targets: string[] | undefined): THREE.Object3D {
+    for (const id of targets ?? []) {
+      const obj = this.deps.actors.resolve(id)
+      if (obj) return obj
+    }
+    return this.deps.actors.resolve('bruno') ?? this.deps.game.sophie
+  }
+
+  // --- Choice / cinematic_choice scenes ---------------------------------
+
+  private runChoice(scene: ChoiceScene | CinematicChoiceScene, preActions?: StoryAction[]): void {
+    const gen = this.generation
+    const showPanel = () => {
+      if (gen !== this.generation) return
+      this.deps.game.states.transition('CHOICE')
+      this.deps.cinematicCamera.stop()
+      this.deps.followCamera.setEnabled(true)
+      this.applyChoiceCamera(scene.camera)
+      this.showChoices(scene)
+    }
+
+    if (preActions && preActions.length > 0) {
+      // Stage the intro like a mini-cinematic, then reveal the cards.
+      this.deps.game.states.transition('CINEMATIC')
+      this.deps.followCamera.setEnabled(false)
+      this.deps.cinematicCamera.play(this.parsePreset(scene.camera)).then(() => {
+        if (gen !== this.generation) return
+        this.playActions(preActions, gen, showPanel)
+      })
+    } else {
+      showPanel()
+    }
+  }
+
+  private showChoices(scene: ChoiceScene | CinematicChoiceScene): void {
+    const gen = this.generation
+    let choices = scene.choices
+    const simplify = scene.simplify_after_misses
+    if (simplify && (this.missCounts.get(scene.id) ?? 0) >= simplify.count) {
+      choices = choices.filter((c) => simplify.keep_choice_ids.includes(c.id))
+      console.log(`[Story] simplified choices for "${scene.id}" -> ${choices.map((c) => c.id).join(', ')}`)
+    }
+
+    this.deps.choicePanel.show(
       {
-        promptIcon: iconFor(scene.prompt?.icon),
-        choices: scene.choices.slice(0, 3).map((c) => ({
+        promptIcon: scene.prompt?.icon ? iconFor(scene.prompt.icon) : undefined,
+        promptText: scene.prompt?.line,
+        choices: choices.slice(0, 3).map((c) => ({
           id: c.id,
           icon: iconFor(c.icon),
           label: c.label ?? labelFromId(c.id),
         })),
       },
       (choiceId) => {
+        if (gen !== this.generation) return
         const choice = scene.choices.find((c) => c.id === choiceId)
         if (!choice) return
-        console.log(`[Story] choice: ${choice.id}${choice.redirect ? ' (redirect)' : ''}`)
-        const gen = this.generation
-        this.onChoice?.(choice.id, choice.redirect === true)
-        // A safety jump inside onChoice bumps the generation — this
-        // continuation is then stale and must not run the old branch.
-        if (gen !== this.generation) return
-        const proceed = () => {
-          if (gen === this.generation) this.runScene(choice.next)
-        }
-        if (choice.sophie_line) this.bubble.say(choice.sophie_line).then(proceed)
-        else proceed()
+        this.handlePick(scene, choice, gen)
       },
     )
   }
 
-  private runCinematic(scene: CinematicScene): void {
-    this.game.states.transition('CINEMATIC')
-    if (scene.bruno_state) this.applyBrunoState(scene.bruno_state)
-    const gen = this.generation
+  private handlePick(
+    scene: ChoiceScene | CinematicChoiceScene,
+    choice: StoryChoice,
+    gen: number,
+  ): void {
+    const flags = [choice.redirect && 'redirect', choice.avoidant && 'avoidant']
+      .filter(Boolean)
+      .join(', ')
+    console.log(`[Story] choice: ${choice.id}${flags ? ` (${flags})` : ''}`)
 
-    // Controls are already locked (state gate); take the camera and tween
-    // slowly into the staged shot, then play the actions.
-    this.followCamera.setEnabled(false)
-    this.cinematicCamera.play(this.parsePreset(scene.camera)).then(() => {
+    if (choice.redirect && !choice.avoidant) {
+      this.missCounts.set(scene.id, (this.missCounts.get(scene.id) ?? 0) + 1)
+    }
+    if (choice.bruno_state) this.deps.brunoView.setState(choice.bruno_state)
+
+    this.onChoice?.(choice.id, choice.redirect === true, choice.avoidant === true)
+    // A safety jump inside onChoice bumps the generation — this
+    // continuation is then stale and must not run the old branch.
+    if (gen !== this.generation) return
+
+    const proceed = () => {
       if (gen !== this.generation) return
-      this.playActions(scene, () => this.runScene(scene.next))
-    })
+      if (choice.outcome_actions && choice.outcome_actions.length > 0) {
+        this.playActions(choice.outcome_actions, gen, () => this.runScene(choice.next))
+      } else {
+        this.runScene(choice.next)
+      }
+    }
+    if (choice.sophie_line) this.deps.bubble.say(choice.sophie_line).then(proceed)
+    else proceed()
   }
 
-  /** Anim stubs are logged; lines go through Sophie's bubble. */
-  private playActions(scene: CinematicScene, done: () => void): void {
-    const actions = [...scene.actions]
+  // --- Minigame ---------------------------------------------------------
+
+  private runMinigame(scene: MinigameScene): void {
+    // Playable: the child explores and taps a cooperative prop. Controls on.
+    this.deps.game.states.transition('EXPLORE')
+    this.deps.cinematicCamera.stop()
+    this.deps.followCamera.setEnabled(true)
+    this.deps.followCamera.focusOn(null)
     const gen = this.generation
+    const verbs = scene.mechanics.options.map((o) => o.verb).join(' / ')
+    console.log(`[Minigame] ${scene.mechanics.interaction}: ${verbs}`)
+
+    const propIds = scene.mechanics.options
+      .map((o) => MINIGAME_PROP[o.id])
+      .filter((id): id is string => id !== undefined)
+
+    this.deps.interaction.overrideActivate = (id) => {
+      if (gen !== this.generation) return false
+      if (!propIds.includes(id)) return false
+      const option = scene.mechanics.options.find((o) => MINIGAME_PROP[o.id] === id)
+      console.log(`[Minigame] cooperative action: ${option?.id ?? id}`)
+      this.deps.interaction.overrideActivate = null
+      if (this.minigameTimer !== null) {
+        window.clearTimeout(this.minigameTimer)
+        this.minigameTimer = null
+      }
+      this.deps.interaction.setHint(null)
+      // Success feedback plays as a short staged moment.
+      this.deps.game.states.transition('CINEMATIC')
+      this.deps.followCamera.setEnabled(false)
+      this.deps.cinematicCamera.play(this.parsePreset('wide')).then(() => {
+        if (gen !== this.generation) return
+        this.playActions(scene.success.feedback_actions, gen, () =>
+          this.runScene(scene.success.next),
+        )
+      })
+      return true
+    }
+
+    // Hesitation fallback: one gentle nudge, only if nothing happened yet.
+    const fallback = scene.hesitation_fallback
+    if (fallback) {
+      this.minigameTimer = window.setTimeout(() => {
+        this.minigameTimer = null
+        if (gen !== this.generation) return
+        console.log('[Minigame] hesitation fallback')
+        this.playActions(fallback.actions, gen, () => {})
+      }, fallback.after_sec * 1000)
+    }
+  }
+
+  // --- End menu ---------------------------------------------------------
+
+  private runEndMenu(scene: EndMenuScene): void {
+    const gen = this.generation
+    const showMenu = () => {
+      if (gen !== this.generation) return
+      this.deps.game.states.transition('CHOICE')
+      this.deps.cinematicCamera.stop()
+      this.deps.followCamera.setEnabled(true)
+      this.deps.followCamera.focusOn(null)
+      this.deps.choicePanel.show(
+        {
+          choices: scene.options.slice(0, 3).map((o) => ({
+            id: o.id,
+            icon: iconFor(o.icon),
+            label: o.label,
+          })),
+        },
+        (optionId) => {
+          if (gen !== this.generation) return
+          const option = scene.options.find((o) => o.id === optionId)
+          if (!option) return
+          console.log(`[Story] end menu: ${option.id} (${option.action})`)
+          this.handleEndMenuAction(option.action, showMenu)
+        },
+      )
+    }
+
+    if (scene.actions && scene.actions.length > 0) {
+      this.deps.game.states.transition('CINEMATIC')
+      this.deps.followCamera.setEnabled(false)
+      this.deps.cinematicCamera.play(this.parsePreset(scene.camera)).then(() => {
+        if (gen !== this.generation) return
+        this.playActions(scene.actions ?? [], gen, showMenu)
+      })
+    } else {
+      showMenu()
+    }
+  }
+
+  private handleEndMenuAction(action: string, reshowMenu: () => void): void {
+    switch (action) {
+      case 'restart_mission':
+        return this.restart()
+      case 'to_hub_stub':
+        // Soft "coming soon" — warm words, no locks, no error styling.
+        this.deps.bubble
+          .say('Another friend is getting ready to meet you. We can visit them soon. 🌿')
+          .then(reshowMenu)
+        return
+      case 'free_roam':
+      default:
+        return this.finish()
+    }
+  }
+
+  // --- Shared action player --------------------------------------------
+
+  /** Plays heterogeneous staged actions sequentially (grey-phase stubs). */
+  private playActions(actions: StoryAction[], gen: number, done: () => void): void {
+    const queue = [...actions]
     const step = () => {
       if (gen !== this.generation) return
-      const action = actions.shift()
+      const action = queue.shift()
       if (!action) return done()
+
       if (action.line) {
-        console.log(`[Cinematic] ${action.actor}: "${action.line}"`)
-        this.bubble.say(action.line).then(step)
-      } else {
-        console.log(`[Cinematic] ${action.actor} plays anim "${action.anim}"`)
-        window.setTimeout(step, 900)
+        console.log(`[Cinematic] ${action.actor ?? 'voice'}: "${action.line}"`)
+        this.deps.bubble.say(action.line).then(step)
+        return
       }
+      if (action.mood) {
+        this.deps.mood.apply(action.mood)
+        step()
+        return
+      }
+      if (action.highlight) {
+        const target = this.deps.interaction.nearest(['bruno'])
+        if (target) this.deps.interaction.setHint(target)
+        console.log(`[Cinematic] highlight ${action.highlight} -> ${target?.id ?? 'none'}`)
+        step()
+        return
+      }
+      if (action.reward) {
+        console.log(`[Cinematic] reward: ${action.reward.type} (${action.reward.style})`)
+        this.deps.mood.setColorTemp('warm')
+        window.setTimeout(step, 600)
+        return
+      }
+      if (action.move) {
+        console.log(`[Stage] ${action.actor} move "${action.move}" (stub)`)
+        window.setTimeout(step, 600)
+        return
+      }
+      if (action.anim) {
+        console.log(`[Cinematic] ${action.actor ?? action.prop ?? 'stage'} plays anim "${action.anim}"`)
+        window.setTimeout(step, 900)
+        return
+      }
+      if (action.props) {
+        console.log(`[Stage] props present: ${action.props.join(', ')}`)
+        step()
+        return
+      }
+      step() // unknown action shape — skip gracefully
     }
     step()
   }
 
+  // --- Camera helpers ---------------------------------------------------
+
   /**
-   * Story JSON camera strings → cinematic presets:
-   * "wide", "closeup_<actor>", "over_shoulder_<actor>" (default actor: bruno).
+   * Story JSON camera strings → cinematic presets: "wide",
+   * "closeup_<actor>", "over_shoulder[_<actor>]", "follow_<actor>".
    */
   private parsePreset(raw: string | undefined): CinematicPreset {
-    const fallback = this.actors.resolve('bruno') ?? this.game.sophie
+    const fallback = this.deps.actors.resolve('bruno') ?? this.deps.game.sophie
     if (raw?.startsWith('closeup_')) {
-      return { kind: 'closeup', actor: this.actors.resolve(raw.slice(8)) ?? fallback }
+      return { kind: 'closeup', actor: this.deps.actors.resolve(raw.slice(8)) ?? fallback }
     }
     if (raw?.startsWith('over_shoulder')) {
       const actorId = raw.replace(/^over_shoulder_?/, '')
       return {
         kind: 'over_shoulder',
-        actor: (actorId && this.actors.resolve(actorId)) || fallback,
-        companion: this.game.sophie,
+        actor: (actorId && this.deps.actors.resolve(actorId)) || fallback,
+        companion: this.deps.game.sophie,
       }
+    }
+    if (raw?.startsWith('follow_')) {
+      return { kind: 'wide', actor: this.deps.actors.resolve(raw.slice(7)) ?? fallback }
     }
     return { kind: 'wide', actor: fallback }
   }
 
   /** CHOICE scenes use the softer follow-camera focus ease-in. */
   private applyChoiceCamera(preset: string | undefined): void {
-    if (preset?.startsWith('closeup_')) {
-      this.followCamera.focusOn(this.actors.resolve(preset.slice(8)))
+    if (preset?.startsWith('closeup_') || preset === 'over_shoulder') {
+      const actorId = preset.startsWith('closeup_') ? preset.slice(8) : 'bruno'
+      this.deps.followCamera.focusOn(this.deps.actors.resolve(actorId))
     } else {
-      this.followCamera.focusOn(null)
+      this.deps.followCamera.focusOn(null)
     }
   }
 
-  private applyBrunoState(state: string): void {
-    console.log(`[Story] bruno_state -> ${state}`)
-    const bruno = this.actors.resolve('bruno')
-    if (!bruno) return
-    const tint = BRUNO_STATE_TINT[state]
-    if (tint === undefined) return
-    bruno.traverse((child) => {
-      const mesh = child as THREE.Mesh
-      if (mesh.isMesh && (mesh.name === 'bruno-body' || mesh.name === 'bruno-head')) {
-        ;(mesh.material as THREE.MeshStandardMaterial).color.setHex(tint)
-      }
-    })
-  }
-
   private finish(): void {
+    this.invalidatePending()
     this.active = false
-    this.choicePanel.hide()
-    this.cinematicCamera.stop()
-    this.followCamera.focusOn(null)
-    this.followCamera.setEnabled(true) // eases home from the last shot
-    this.game.states.transition('EXPLORE')
+    this.deps.cinematicCamera.stop()
+    this.deps.followCamera.focusOn(null)
+    this.deps.followCamera.setEnabled(true) // eases home from the last shot
+    this.deps.game.states.transition('EXPLORE')
     console.log('[Story] segment complete — back to exploration')
   }
 }

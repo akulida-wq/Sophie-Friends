@@ -1,11 +1,21 @@
 import { Game } from './core/Game'
+import { Mood } from './core/Mood'
 import { SophieController } from './player/SophieController'
 import { FollowCamera } from './camera/FollowCamera'
 import { CinematicCamera } from './camera/CinematicCamera'
 import { InteractionSystem } from './interaction/InteractionSystem'
-import { createBall, createBlocks, createBruno, createTree } from './interaction/Placeholders'
+import {
+  createBall,
+  createBlocks,
+  createBruno,
+  createChalk,
+  createFriends,
+  createTree,
+} from './interaction/Placeholders'
+import { BrunoView } from './interaction/BrunoView'
 import { ChoicePanel } from './dialogue/ChoicePanel'
 import { SophieBubble } from './dialogue/SophieBubble'
+import { TapCue } from './dialogue/TapCue'
 import { PauseOverlay } from './safety/PauseOverlay'
 import { SafetyLayer } from './safety/SafetyLayer'
 import { StoryEngine } from './story/StoryEngine'
@@ -23,26 +33,35 @@ const cinematicCamera = new CinematicCamera(game.camera)
 const interaction = new InteractionSystem(game)
 const choicePanel = new ChoicePanel(document.body)
 const bubble = new SophieBubble(document.body)
+const tapCue = new TapCue(document.body, game.camera)
+const mood = new Mood(game.scene)
 new PauseOverlay(document.body, game)
 
 controller.tapInterceptor = (raycaster) => interaction.tryActivate(raycaster)
 
-// --- Placeholder props and NPC (grey-box positions, GLB later) ---
+// --- Placeholder props, NPC and friends (grey-box, GLB in Tasks 7-8) ---
 const ball = createBall()
 ball.position.set(3.5, 0, 1.5)
 const blocks = createBlocks()
 blocks.position.set(-4, 0, -2.5)
 const tree = createTree()
 tree.position.set(5.5, 0, -6)
+const chalk = createChalk()
+chalk.position.set(1.5, 0, -4)
 const bruno = createBruno()
 bruno.position.set(-3, 0, -8)
 bruno.rotation.y = Math.PI / 6
-game.scene.add(ball, blocks, tree, bruno)
+const friends = createFriends()
+friends.position.set(4, 0, -12)
+game.scene.add(ball, blocks, tree, chalk, bruno, friends)
+
+const brunoView = new BrunoView(bruno)
 
 for (const [id, object] of [
   ['ball', ball],
   ['blocks', blocks],
   ['tree', tree],
+  ['chalk', chalk],
 ] as const) {
   interaction.add({
     id,
@@ -54,12 +73,21 @@ for (const [id, object] of [
 
 // --- Story: mission JSON drives everything after this point ---
 const story = new StoryEngine(
-  game,
-  followCamera,
-  cinematicCamera,
-  choicePanel,
-  bubble,
-  { resolve: (actorId) => (actorId === 'sophie' ? game.sophie : game.scene.getObjectByName(actorId) ?? null) },
+  {
+    game,
+    followCamera,
+    cinematicCamera,
+    choicePanel,
+    bubble,
+    tapCue,
+    interaction,
+    brunoView,
+    mood,
+    actors: {
+      resolve: (actorId) =>
+        actorId === 'sophie' ? game.sophie : game.scene.getObjectByName(actorId) ?? null,
+    },
+  },
   brunoMission as StoryMission,
 )
 
@@ -77,6 +105,9 @@ game.addUpdatable((dt) => controller.update(dt))
 game.addUpdatable((dt, elapsed) => interaction.update(dt, elapsed))
 game.addUpdatable((dt) => followCamera.update(dt))
 game.addUpdatable((dt) => cinematicCamera.update(dt))
+game.addUpdatable((dt) => brunoView.update(dt))
+game.addUpdatable((dt) => mood.update(dt))
+game.addUpdatable(() => tapCue.update())
 game.addUpdatable((dt) => safety.update(dt))
 
 game.start()
@@ -92,6 +123,9 @@ declare global {
       interaction: InteractionSystem
       choicePanel: ChoicePanel
       bubble: SophieBubble
+      tapCue: TapCue
+      brunoView: BrunoView
+      mood: Mood
       story: StoryEngine
       safety: SafetyLayer
     }
@@ -105,6 +139,9 @@ window.sophieDebug = {
   interaction,
   choicePanel,
   bubble,
+  tapCue,
+  brunoView,
+  mood,
   story,
   safety,
 }

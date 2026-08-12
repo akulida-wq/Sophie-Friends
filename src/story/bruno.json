@@ -1,61 +1,262 @@
 {
   "mission": "bruno_missing_friend_feeling",
+  "title": "Bruno and the Missing Friend Feeling",
+  "entry": "gentle_arrival",
   "safety": {
     "idle_hint_sec": 10,
-    "avoid_streak_soft_branch": 2,
-    "soft_branch_id": "acknowledge",
-    "idle_hint_line": "A little step is enough."
+    "avoid_streak": 2,
+    "soft_branch_target": "soft_support"
   },
+  "actors": {
+    "sophie": { "model": "sophie.glb" },
+    "bruno": { "model": "bruno.glb", "initial_state": "withdrawn" },
+    "friends": { "model": "friends_group.glb", "count": 3 }
+  },
+  "bruno_states": ["withdrawn", "noticed", "named", "accepted", "trying", "wobble", "connected"],
+
   "scenes": [
     {
       "id": "gentle_arrival",
       "type": "cinematic",
+      "duration_hint_sec": 50,
       "camera": "wide",
+      "mood": { "music": "ambient_calm", "color_temp": "cool" },
       "actions": [
-        { "actor": "sophie", "line": "There's Bruno. He seems very quiet today." },
-        { "actor": "bruno", "anim": "head_down" }
+        { "actor": "bruno", "anim": "IdleSad", "note": "stands apart, looks at friends, then down" },
+        { "actor": "friends", "anim": "PlayQuiet", "note": "visible in distance, playing quietly" },
+        { "actor": "sophie", "move": "enter_from_side", "anim": "Walk" },
+        { "actor": "sophie", "line": "Hi, Bruno. You look a little far away today.", "voice": "s1_sophie_far_away" }
       ],
+      "advance": { "on": "tap_cue", "cue_targets": ["bruno", "heart_icon"] },
       "next": "recognize_feeling",
-      "bruno_state": "withdrawn"
+      "bruno_state": "noticed"
     },
+
     {
       "id": "recognize_feeling",
       "type": "choice",
       "camera": "closeup_bruno",
-      "prompt": { "icon": "question" },
+      "prompt": { "line": "What might Bruno be feeling?", "voice": "s2_sophie_what_feeling", "icon": "question" },
+      "setup_actions": [
+        { "actor": "bruno", "anim": "IdleSad", "note": "small shrug, looks at friends, then at ground" }
+      ],
       "choices": [
-        {
-          "id": "lonely",
-          "icon": "face_lonely",
-          "next": "acknowledge",
-          "sophie_line": "Yes. Bruno misses being close to friends."
-        },
-        {
-          "id": "mad",
-          "icon": "face_mad",
-          "next": "recognize_feeling",
-          "sophie_line": "Maybe a little frustrated... let's look again.",
-          "redirect": true
-        },
-        {
-          "id": "sleepy",
-          "icon": "face_sleepy",
-          "next": "recognize_feeling",
-          "sophie_line": "Bruno looks droopy, but it's more about missing someone.",
-          "redirect": true
-        }
-      ]
+        { "id": "lonely", "icon": "face_lonely", "label": "Lonely",
+          "sophie_line": "Yes. Bruno misses being close to friends.",
+          "voice": "s2_sophie_lonely_yes", "next": "acknowledge" },
+        { "id": "mad", "icon": "face_mad", "label": "Mad", "redirect": true,
+          "sophie_line": "Maybe a little frustrated, but look how Bruno keeps watching the others. Let's look again.",
+          "voice": "s2_sophie_mad_redirect", "next": "recognize_feeling" },
+        { "id": "sleepy", "icon": "face_sleepy", "label": "Sleepy", "redirect": true,
+          "sophie_line": "Bruno looks droopy, but his feeling is more about missing someone.",
+          "voice": "s2_sophie_sleepy_redirect", "next": "recognize_feeling" }
+      ],
+      "simplify_after_misses": { "count": 2, "keep_choice_ids": ["lonely", "sleepy"] }
     },
+
     {
       "id": "acknowledge",
+      "type": "cinematic_choice",
+      "camera": "over_shoulder",
+      "intro_actions": [
+        { "actor": "sophie",
+          "line": "It's okay to feel lonely sometimes. Missing friends can make your heart feel quiet.",
+          "voice": "s3_sophie_its_okay" },
+        { "actor": "bruno", "anim": "HandToChest", "note": "looks up slightly, breathing slows" }
+      ],
+      "choices": [
+        { "id": "its_okay", "icon": "heart", "label": "It's okay",
+          "next": "choose_step", "bruno_state": "accepted",
+          "note": "Bruno visibly relaxes a little (state blend, no extra clip)" },
+        { "id": "stay_hidden", "icon": "hiding", "label": "Stay hidden",
+          "redirect": true, "avoidant": true,
+          "sophie_line": "Hiding can feel safe for a moment. But sometimes a tiny step helps more.",
+          "voice": "s3_sophie_hiding_redirect", "next": "acknowledge" }
+      ],
+      "bruno_state": "named"
+    },
+
+    {
+      "id": "choose_step",
+      "type": "choice",
+      "camera": "wide",
+      "mood": { "color_temp": "neutral" },
+      "prompt": { "line": "What small step could Bruno try?", "voice": "s4_sophie_small_step", "icon": "footstep" },
+      "setup_actions": [
+        { "actor": "friends", "anim": "PlayQuiet", "note": "rolling a ball nearby" },
+        { "props": ["ball", "chalk", "blocks", "tree"] }
+      ],
+      "choices": [
+        { "id": "wave", "icon": "wave", "label": "Wave from far away", "next": "outcome_wave" },
+        { "id": "sit_behind_tree", "icon": "tree", "label": "Sit behind the tree",
+          "redirect": true, "avoidant": true, "next": "outcome_tree" },
+        { "id": "bring_ball", "icon": "ball", "label": "Bring a ball to share", "next": "outcome_ball" }
+      ]
+    },
+
+    {
+      "id": "soft_support",
+      "type": "choice",
+      "camera": "wide",
+      "note": "Shortened support branch after repeated avoidance. Calmer tone, 2 options only.",
+      "prompt": { "line": "Let's try a tiny step together.", "voice": "s4_sophie_together", "icon": "footstep" },
+      "setup_actions": [
+        { "actor": "sophie", "move": "stand_beside_bruno", "anim": "TailWag" }
+      ],
+      "choices": [
+        { "id": "wave", "icon": "wave", "label": "Wave from far away", "next": "outcome_wave" },
+        { "id": "bring_ball", "icon": "ball", "label": "Bring a ball to share", "next": "outcome_ball" }
+      ]
+    },
+
+    {
+      "id": "outcome_wave",
+      "type": "cinematic",
+      "camera": "closeup_friend",
+      "actions": [
+        { "actor": "bruno", "anim": "SmallWave" },
+        { "actor": "friends", "anim": "NoticeSmile", "note": "one friend notices and smiles" },
+        { "actor": "sophie", "line": "That was a brave first step.", "voice": "s4_sophie_brave_step" }
+      ],
+      "next": "minigame_approach",
+      "bruno_state": "trying"
+    },
+
+    {
+      "id": "outcome_tree",
       "type": "cinematic",
       "camera": "wide",
       "actions": [
-        { "actor": "bruno", "anim": "hand_to_chest" },
-        { "actor": "sophie", "line": "It's okay to feel lonely sometimes." }
+        { "actor": "bruno", "anim": "SitAlone", "note": "feels no better" },
+        { "actor": "sophie", "move": "approach_soft",
+          "line": "Sometimes staying away keeps the lonely feeling big. Let's try a tiny step together.",
+          "voice": "s4_sophie_staying_away" }
       ],
-      "next": "end",
-      "bruno_state": "named"
+      "next": "soft_support"
+    },
+
+    {
+      "id": "outcome_ball",
+      "type": "cinematic",
+      "camera": "wide",
+      "actions": [
+        { "actor": "bruno", "anim": "Walk", "prop": "ball", "note": "carries the ball toward the group" },
+        { "actor": "friends", "anim": "BrightenMakeRoom", "note": "friends brighten and make room" },
+        { "actor": "sophie", "line": "Sharing can open the door.", "voice": "s4_sophie_sharing" }
+      ],
+      "next": "minigame_approach",
+      "bruno_state": "trying"
+    },
+
+    {
+      "id": "minigame_approach",
+      "type": "minigame",
+      "camera": "follow_bruno",
+      "duration_hint_sec": 120,
+      "mechanics": {
+        "interaction": "tap_or_drag",
+        "options": [
+          { "id": "roll_ball", "verb": "roll the ball toward the group" },
+          { "id": "place_block", "verb": "place a block on the shared tower" },
+          { "id": "draw_chalk", "verb": "draw next to friends" }
+        ]
+      },
+      "success": {
+        "condition": "any_cooperative_action",
+        "feedback_actions": [
+          { "actor": "friends", "anim": "WelcomeGesture", "note": "smile, shift over, gesture welcome" },
+          { "actor": "bruno", "anim": "IdleOpen", "note": "posture opens" },
+          { "mood": { "music": "ambient_warm_lift" } }
+        ],
+        "next": "setback_recovery"
+      },
+      "hesitation_fallback": {
+        "after_sec": 10,
+        "actions": [
+          { "actor": "sophie", "move": "approach_soft" },
+          { "highlight": "nearest_interactable", "style": "soft_glow_pulse" },
+          { "actor": "sophie", "line": "A little step is enough.", "voice": "s5_sophie_little_step" }
+        ]
+      }
+    },
+
+    {
+      "id": "setback_recovery",
+      "type": "cinematic_choice",
+      "camera": "closeup_bruno",
+      "note": "Mild awkwardness only — NOT social rejection. Ball rolls slightly off / blocks wobble.",
+      "intro_actions": [
+        { "actor": "bruno", "anim": "TryJoinClumsy", "note": "first attempt is clumsy" },
+        { "prop": "ball", "anim": "RollOffCourse" }
+      ],
+      "choices": [
+        { "id": "try_again", "icon": "retry", "label": "Try again",
+          "next": "recovery_success", "bruno_state": "wobble" },
+        { "id": "ask_sophie", "icon": "sophie", "label": "Ask Sophie for help",
+          "next": "recovery_coregulated", "bruno_state": "wobble" },
+        { "id": "walk_away", "icon": "away", "label": "Walk away",
+          "redirect": true, "avoidant": true,
+          "sophie_line": "Bruno can still try one little thing.",
+          "voice": "s6_sophie_one_little_thing", "next": "setback_recovery" }
+      ]
+    },
+
+    {
+      "id": "recovery_success",
+      "type": "cinematic",
+      "camera": "wide",
+      "actions": [
+        { "actor": "bruno", "anim": "TryAgainSucceed" },
+        { "actor": "friends", "anim": "WelcomeGesture" }
+      ],
+      "next": "resolution"
+    },
+
+    {
+      "id": "recovery_coregulated",
+      "type": "cinematic",
+      "camera": "over_shoulder",
+      "actions": [
+        { "actor": "sophie", "move": "stand_beside_bruno", "anim": "TailWag" },
+        { "actor": "bruno", "anim": "TryAgainSucceed", "note": "co-regulated success with Sophie beside" }
+      ],
+      "next": "resolution"
+    },
+
+    {
+      "id": "resolution",
+      "type": "cinematic",
+      "camera": "wide",
+      "mood": { "music": "ambient_warm", "color_temp": "warm" },
+      "actions": [
+        { "actor": "bruno", "anim": "PlayIncluded", "note": "included in activity, calmer face, upright stance" },
+        { "actor": "friends", "anim": "PlayQuiet" },
+        { "actor": "sophie", "line": "Lonely feelings can shrink when we take kind little steps.",
+          "voice": "s7_sophie_shrink" },
+        { "actor": "bruno", "line": "I still missed my friends... but I'm not all alone.",
+          "voice": "s7_bruno_not_alone" },
+        { "reward": { "type": "gentle_badge", "style": "warm_glow", "note": "no score, no competition" } }
+      ],
+      "next": "calm_exit",
+      "bruno_state": "connected"
+    },
+
+    {
+      "id": "calm_exit",
+      "type": "end_menu",
+      "camera": "wide",
+      "duration_hint_sec": 40,
+      "actions": [
+        { "actor": "sophie",
+          "line": "We noticed Bruno's feeling. We helped him take a step. We kept going kindly.",
+          "voice": "s8_sophie_recap" }
+      ],
+      "options": [
+        { "id": "play_again", "icon": "replay", "label": "Play again", "action": "restart_mission" },
+        { "id": "next_friend", "icon": "friends", "label": "Visit another friend later", "action": "to_hub_stub" },
+        { "id": "quiet_play", "icon": "leaf", "label": "Quiet play", "action": "free_roam" }
+      ],
+      "mood": { "music": "ambient_calm", "note": "end with regulation, no excitement spike" }
     }
   ]
 }

@@ -52,6 +52,41 @@ export function createTree(): THREE.Group {
   return group
 }
 
+export function createChalk(): THREE.Group {
+  const group = new THREE.Group()
+  group.name = 'chalk'
+  const colors = [0xd98ca3, 0x8cb8d9, 0xd9c98c]
+  colors.forEach((color, i) => {
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8), standard(color))
+    stick.rotation.z = Math.PI / 2
+    stick.rotation.y = i * 0.6
+    stick.position.set(i * 0.18 - 0.18, 0.06, i * 0.1)
+    stick.castShadow = true
+    group.add(stick)
+  })
+  return group
+}
+
+/** 2–3 background friends playing quietly in the distance (no dialogue). */
+export function createFriends(): THREE.Group {
+  const group = new THREE.Group()
+  group.name = 'friends'
+  const colors = [0xd9a3b8, 0xd9cf8c, 0x9cd98c]
+  const spots: Array<[number, number]> = [
+    [0, 0],
+    [1.3, 0.5],
+    [0.6, 1.4],
+  ]
+  colors.forEach((color, i) => {
+    const friend = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 1.0, 8, 12), standard(color))
+    friend.position.set(spots[i][0], 0.8, spots[i][1])
+    friend.castShadow = true
+    friend.name = `friend-${i}`
+    group.add(friend)
+  })
+  return group
+}
+
 /** Bruno: tall, thin, blue, green sneakers — withdrawn pose comes later. */
 export function createBruno(): THREE.Group {
   const group = new THREE.Group()

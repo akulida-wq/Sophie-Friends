@@ -15,6 +15,11 @@ export class InteractionSystem {
   private focused: Interactable | null = null
   /** Forced highlight target for Sophie's hints (Task 4). */
   private hinted: Interactable | null = null
+  /**
+   * Minigame hook: gets first look at in-range activations; return true
+   * to consume the tap instead of the interactable's own onActivate.
+   */
+  overrideActivate: ((id: string) => boolean) | null = null
 
   constructor(private readonly game: Game) {}
 
@@ -42,6 +47,21 @@ export class InteractionSystem {
     this.hinted = interactable
   }
 
+  /** Nearest interactable to Sophie (for hint highlights). */
+  nearest(excludeIds: string[] = []): Interactable | null {
+    let best: Interactable | null = null
+    let bestDist = Infinity
+    for (const item of this.interactables) {
+      if (excludeIds.includes(item.id)) continue
+      const d = this.distanceTo(item)
+      if (d < bestDist) {
+        best = item
+        bestDist = d
+      }
+    }
+    return best
+  }
+
   /**
    * Called by SophieController before the ground raycast. Returns true if
    * the tap hit an in-range interactable (consuming the tap).
@@ -52,6 +72,7 @@ export class InteractionSystem {
       if (!this.inRange(item)) continue
       if (raycaster.intersectObject(item.object, true).length > 0) {
         this.setGlow(item, 0)
+        if (this.overrideActivate?.(item.id)) return true
         item.onActivate()
         return true
       }

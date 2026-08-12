@@ -6,6 +6,8 @@ export interface ChoiceOption {
 
 export interface ChoicePanelContent {
   promptIcon?: string
+  /** Optional question shown softly above the cards. */
+  promptText?: string
   choices: ChoiceOption[]
 }
 
@@ -32,6 +34,19 @@ export class ChoicePanel {
     this.onPick = onPick
     this.root.innerHTML = ''
 
+    if (content.promptText) {
+      const prompt = document.createElement('div')
+      prompt.className = 'choice-panel__prompt'
+      prompt.textContent = content.promptIcon
+        ? `${content.promptIcon} ${content.promptText}`
+        : content.promptText
+      this.root.appendChild(prompt)
+    }
+
+    const row = document.createElement('div')
+    row.className = 'choice-panel__cards'
+    this.root.appendChild(row)
+
     for (const choice of content.choices.slice(0, 3)) {
       const card = document.createElement('button')
       card.className = 'choice-card'
@@ -48,7 +63,7 @@ export class ChoicePanel {
       card.append(icon, label)
       card.addEventListener('pointerdown', (e) => e.stopPropagation())
       card.addEventListener('click', () => this.pick(choice.id))
-      this.root.appendChild(card)
+      row.appendChild(card)
     }
 
     // Double rAF so the browser paints the hidden state before the

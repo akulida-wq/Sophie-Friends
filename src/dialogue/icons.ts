@@ -9,8 +9,18 @@ const ICONS: Record<string, string> = {
   face_sleepy: '😴',
   wave: '👋',
   hide: '🙈',
+  hiding: '🙈',
   ball: '⚽',
   sparkle: '✨',
+  heart: '💛',
+  footstep: '👣',
+  tree: '🌳',
+  retry: '🔁',
+  sophie: '🐶',
+  away: '🚶',
+  replay: '🔁',
+  friends: '🧑‍🤝‍🧑',
+  leaf: '🍃',
 }
 
 export function iconFor(key: string | undefined): string {

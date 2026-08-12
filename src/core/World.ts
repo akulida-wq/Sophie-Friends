@@ -24,6 +24,7 @@ export function createWorld(scene: THREE.Scene): void {
 
   // Warm directional "afternoon sun", soft shadows.
   const sun = new THREE.DirectionalLight(0xffe8c0, 1.4)
+  sun.name = 'sun'
   sun.position.set(8, 14, 6)
   sun.castShadow = true
   sun.shadow.mapSize.set(2048, 2048)

@@ -27,14 +27,32 @@
         right: 0;
         bottom: 0;
         display: flex;
-        gap: 3vw;
+        flex-direction: column;
+        gap: 1.5vh;
         padding: 3vw;
-        justify-content: center;
-        align-items: stretch;
+        align-items: center;
         opacity: 0;
         transform: translateY(24px);
         transition: opacity 0.45s ease, transform 0.45s ease;
         pointer-events: none;
+      }
+      .choice-panel__prompt {
+        padding: 1.4vh 2.6vh;
+        border-radius: 18px;
+        background: rgba(255, 250, 240, 0.92);
+        box-shadow: 0 4px 16px rgba(90, 80, 60, 0.14);
+        font-size: 2.6vh;
+        font-weight: 600;
+        color: #6b5d4f;
+        text-align: center;
+        max-width: 88vw;
+      }
+      .choice-panel__cards {
+        display: flex;
+        gap: 3vw;
+        justify-content: center;
+        align-items: stretch;
+        width: 100%;
       }
       .choice-panel--open {
         opacity: 1;
@@ -43,7 +61,7 @@
       }
       .choice-card {
         flex: 1;
-        max-width: 30%;
+        max-width: 32%;
         min-height: 25vh;
         display: flex;
         flex-direction: column;
@@ -69,6 +87,32 @@
         font-size: 2.6vh;
         color: #6b5d4f;
         font-weight: 600;
+      }
+
+      /* --- Tap cue: gentle breathing pulse, waits forever (no timer) --- */
+      .tap-cue {
+        position: fixed;
+        width: 9vh;
+        height: 9vh;
+        margin-left: -4.5vh;
+        margin-top: -4.5vh;
+        border: none;
+        border-radius: 50%;
+        background: rgba(255, 250, 240, 0.92);
+        box-shadow: 0 6px 20px rgba(90, 80, 60, 0.2);
+        font-size: 4.4vh;
+        cursor: pointer;
+        display: none;
+        z-index: 18;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .tap-cue--open {
+        display: block;
+        animation: cue-breathe 1.8s ease-in-out infinite;
+      }
+      @keyframes cue-breathe {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
       }
 
       /* --- Sophie's speech bubble (placeholder for voice-over) --- */
