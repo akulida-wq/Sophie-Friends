@@ -19,6 +19,96 @@
       }
       #app { width: 100%; height: 100%; }
       canvas { display: block; }
+
+      /* --- Choice panel: max 3 large touch cards, no timer --- */
+      .choice-panel {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        gap: 3vw;
+        padding: 3vw;
+        justify-content: center;
+        align-items: stretch;
+        opacity: 0;
+        transform: translateY(24px);
+        transition: opacity 0.45s ease, transform 0.45s ease;
+        pointer-events: none;
+      }
+      .choice-panel--open {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+      .choice-card {
+        flex: 1;
+        max-width: 30%;
+        min-height: 25vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5vh;
+        border: none;
+        border-radius: 24px;
+        background: rgba(255, 250, 240, 0.94);
+        box-shadow: 0 6px 24px rgba(90, 80, 60, 0.18);
+        cursor: pointer;
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .choice-card:active {
+        transform: scale(0.97);
+      }
+      .choice-card__icon {
+        font-size: 9vh;
+        line-height: 1;
+      }
+      .choice-card__label {
+        font-size: 2.6vh;
+        color: #6b5d4f;
+        font-weight: 600;
+      }
+
+      /* --- Pause: always available, calm, no confirm dialogs --- */
+      .pause-button {
+        position: fixed;
+        top: 2.5vh;
+        right: 2.5vh;
+        width: 7vh;
+        height: 7vh;
+        border: none;
+        border-radius: 50%;
+        background: rgba(255, 250, 240, 0.9);
+        box-shadow: 0 4px 14px rgba(90, 80, 60, 0.16);
+        font-size: 3.2vh;
+        cursor: pointer;
+        z-index: 20;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .pause-veil {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(210, 225, 235, 0.85);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.5s ease;
+        z-index: 30;
+      }
+      .pause-veil--open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .pause-veil__message {
+        font-size: 3.4vh;
+        color: #5a6b74;
+        text-align: center;
+        padding: 0 6vw;
+      }
     </style>
   </head>
   <body>

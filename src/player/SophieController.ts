@@ -28,6 +28,8 @@ export class SophieController {
   private anim: AnimState = 'Idle'
   /** Set by SafetyLayer (Task 4) to notice activity; also used for tests. */
   onInput: (() => void) | null = null
+  /** Interaction system gets first look at taps; true = tap consumed. */
+  tapInterceptor: ((raycaster: THREE.Raycaster) => boolean) | null = null
 
   constructor(private readonly game: Game) {
     game.renderer.domElement.addEventListener('pointerdown', (e) => {
@@ -57,6 +59,8 @@ export class SophieController {
     this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
     this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
     this.raycaster.setFromCamera(this.pointer, this.game.camera)
+
+    if (this.tapInterceptor?.(this.raycaster)) return
 
     const ground = this.game.scene.getObjectByName('ground')
     if (!ground) return

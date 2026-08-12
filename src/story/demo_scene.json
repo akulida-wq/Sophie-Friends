@@ -1,0 +1,10 @@
+{
+  "id": "bruno_demo_choice",
+  "type": "choice",
+  "prompt": { "icon": "❓" },
+  "choices": [
+    { "id": "lonely", "icon": "😔", "label": "Lonely" },
+    { "id": "mad", "icon": "😠", "label": "Mad" },
+    { "id": "sleepy", "icon": "😴", "label": "Sleepy" }
+  ]
+}
