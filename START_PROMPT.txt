@@ -1,0 +1,22 @@
+СТАРТОВЫЙ ПРОМТ ДЛЯ CLAUDE CODE
+(открой терминал в этой папке, запусти `claude`, вставь текст ниже)
+
+--------------------------------------------------------------------
+
+Read CLAUDE.md first and follow it exactly. Then read all files in
+/docs (01, 02, 03) to understand the project. Then open TASKS.md and
+execute the tasks strictly in order, one at a time: implement, verify
+it runs with `npm run dev`, commit, print a short summary, and only
+then move to the next task. Do not skip ahead, do not expand scope,
+and never violate the safety rules in CLAUDE.md. When all tasks in
+TASKS.md are complete, stop and print the final message defined in
+CLAUDE.md ("PHASE 1 COMPLETE...") so I know to return to the Claude
+chat for the full bruno.json and the next task pack.
+
+--------------------------------------------------------------------
+
+ПРОМТ ДЛЯ ПРОДОЛЖЕНИЯ РАБОТЫ (если сессия прервалась):
+
+Read CLAUDE.md and TASKS.md. Check git log and the current code to
+determine which task was last completed, verify it still runs, and
+continue from the next unfinished task following the same workflow.
