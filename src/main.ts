@@ -4,8 +4,12 @@ import { FollowCamera } from './camera/FollowCamera'
 import { InteractionSystem } from './interaction/InteractionSystem'
 import { createBall, createBlocks, createBruno, createTree } from './interaction/Placeholders'
 import { ChoicePanel } from './dialogue/ChoicePanel'
+import { SophieBubble } from './dialogue/SophieBubble'
 import { PauseOverlay } from './safety/PauseOverlay'
-import demoScene from './story/demo_scene.json'
+import { SafetyLayer } from './safety/SafetyLayer'
+import { StoryEngine } from './story/StoryEngine'
+import type { StoryMission } from './story/types'
+import brunoMission from './story/bruno.json'
 
 const container = document.getElementById('app')
 if (!container) throw new Error('Missing #app container')
@@ -16,6 +20,7 @@ const controller = new SophieController(game)
 const followCamera = new FollowCamera(game.camera, game.sophie)
 const interaction = new InteractionSystem(game)
 const choicePanel = new ChoicePanel(document.body)
+const bubble = new SophieBubble(document.body)
 new PauseOverlay(document.body, game)
 
 controller.tapInterceptor = (raycaster) => interaction.tryActivate(raycaster)
@@ -45,27 +50,30 @@ for (const [id, object] of [
   })
 }
 
+// --- Story: mission JSON drives everything after this point ---
+const story = new StoryEngine(
+  game,
+  followCamera,
+  choicePanel,
+  bubble,
+  { resolve: (actorId) => (actorId === 'sophie' ? game.sophie : game.scene.getObjectByName(actorId) ?? null) },
+  brunoMission as StoryMission,
+)
+
+const safety = new SafetyLayer(game, interaction, bubble, story)
+controller.onInput = () => safety.notifyActivity()
+
 interaction.add({
   id: 'bruno',
   object: bruno,
   triggerRadius: 3,
-  onActivate: () => {
-    game.states.transition('CHOICE')
-    followCamera.focusOn(bruno)
-    choicePanel.show(
-      { promptIcon: demoScene.prompt.icon, choices: demoScene.choices },
-      (choiceId) => {
-        console.log(`[Choice] picked: ${choiceId}`)
-        followCamera.focusOn(null)
-        game.states.transition('EXPLORE')
-      },
-    )
-  },
+  onActivate: () => story.start(),
 })
 
 game.addUpdatable((dt) => controller.update(dt))
 game.addUpdatable((dt, elapsed) => interaction.update(dt, elapsed))
 game.addUpdatable((dt) => followCamera.update(dt))
+game.addUpdatable((dt) => safety.update(dt))
 
 game.start()
 
@@ -78,8 +86,11 @@ declare global {
       followCamera: FollowCamera
       interaction: InteractionSystem
       choicePanel: ChoicePanel
+      bubble: SophieBubble
+      story: StoryEngine
+      safety: SafetyLayer
     }
   }
 }
 window.game = game
-window.sophieDebug = { controller, followCamera, interaction, choicePanel }
+window.sophieDebug = { controller, followCamera, interaction, choicePanel, bubble, story, safety }

@@ -1,0 +1,61 @@
+{
+  "mission": "bruno_missing_friend_feeling",
+  "safety": {
+    "idle_hint_sec": 10,
+    "avoid_streak_soft_branch": 2,
+    "soft_branch_id": "acknowledge",
+    "idle_hint_line": "A little step is enough."
+  },
+  "scenes": [
+    {
+      "id": "gentle_arrival",
+      "type": "cinematic",
+      "camera": "wide",
+      "actions": [
+        { "actor": "sophie", "line": "There's Bruno. He seems very quiet today." },
+        { "actor": "bruno", "anim": "head_down" }
+      ],
+      "next": "recognize_feeling",
+      "bruno_state": "withdrawn"
+    },
+    {
+      "id": "recognize_feeling",
+      "type": "choice",
+      "camera": "closeup_bruno",
+      "prompt": { "icon": "question" },
+      "choices": [
+        {
+          "id": "lonely",
+          "icon": "face_lonely",
+          "next": "acknowledge",
+          "sophie_line": "Yes. Bruno misses being close to friends."
+        },
+        {
+          "id": "mad",
+          "icon": "face_mad",
+          "next": "recognize_feeling",
+          "sophie_line": "Maybe a little frustrated... let's look again.",
+          "redirect": true
+        },
+        {
+          "id": "sleepy",
+          "icon": "face_sleepy",
+          "next": "recognize_feeling",
+          "sophie_line": "Bruno looks droopy, but it's more about missing someone.",
+          "redirect": true
+        }
+      ]
+    },
+    {
+      "id": "acknowledge",
+      "type": "cinematic",
+      "camera": "wide",
+      "actions": [
+        { "actor": "bruno", "anim": "hand_to_chest" },
+        { "actor": "sophie", "line": "It's okay to feel lonely sometimes." }
+      ],
+      "next": "end",
+      "bruno_state": "named"
+    }
+  ]
+}
