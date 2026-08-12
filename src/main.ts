@@ -1,6 +1,7 @@
 import { Game } from './core/Game'
 import { SophieController } from './player/SophieController'
 import { FollowCamera } from './camera/FollowCamera'
+import { CinematicCamera } from './camera/CinematicCamera'
 import { InteractionSystem } from './interaction/InteractionSystem'
 import { createBall, createBlocks, createBruno, createTree } from './interaction/Placeholders'
 import { ChoicePanel } from './dialogue/ChoicePanel'
@@ -18,6 +19,7 @@ const game = new Game(container)
 
 const controller = new SophieController(game)
 const followCamera = new FollowCamera(game.camera, game.sophie)
+const cinematicCamera = new CinematicCamera(game.camera)
 const interaction = new InteractionSystem(game)
 const choicePanel = new ChoicePanel(document.body)
 const bubble = new SophieBubble(document.body)
@@ -54,6 +56,7 @@ for (const [id, object] of [
 const story = new StoryEngine(
   game,
   followCamera,
+  cinematicCamera,
   choicePanel,
   bubble,
   { resolve: (actorId) => (actorId === 'sophie' ? game.sophie : game.scene.getObjectByName(actorId) ?? null) },
@@ -73,6 +76,7 @@ interaction.add({
 game.addUpdatable((dt) => controller.update(dt))
 game.addUpdatable((dt, elapsed) => interaction.update(dt, elapsed))
 game.addUpdatable((dt) => followCamera.update(dt))
+game.addUpdatable((dt) => cinematicCamera.update(dt))
 game.addUpdatable((dt) => safety.update(dt))
 
 game.start()
@@ -84,6 +88,7 @@ declare global {
     sophieDebug: {
       controller: SophieController
       followCamera: FollowCamera
+      cinematicCamera: CinematicCamera
       interaction: InteractionSystem
       choicePanel: ChoicePanel
       bubble: SophieBubble
@@ -93,4 +98,13 @@ declare global {
   }
 }
 window.game = game
-window.sophieDebug = { controller, followCamera, interaction, choicePanel, bubble, story, safety }
+window.sophieDebug = {
+  controller,
+  followCamera,
+  cinematicCamera,
+  interaction,
+  choicePanel,
+  bubble,
+  story,
+  safety,
+}

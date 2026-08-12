@@ -1,6 +1,7 @@
 import type * as THREE from 'three'
 import type { Game } from '../core/Game'
 import type { FollowCamera } from '../camera/FollowCamera'
+import type { CinematicCamera, CinematicPreset } from '../camera/CinematicCamera'
 import type { ChoicePanel } from '../dialogue/ChoicePanel'
 import type { SophieBubble } from '../dialogue/SophieBubble'
 import { iconFor, labelFromId } from '../dialogue/icons'
@@ -23,7 +24,6 @@ const BRUNO_STATE_TINT: Record<string, number> = {
   connected: 0xa3cbef,
 }
 
-type CinematicPlayer = (scene: CinematicScene, done: () => void) => void
 
 /**
  * Drives the mission from story JSON. Content (lines, choices, branching)
@@ -37,19 +37,17 @@ export class StoryEngine {
   private generation = 0
   /** Called when a choice is picked; SafetyLayer listens for redirects. */
   onChoice: ((choiceId: string, redirect: boolean) => void) | null = null
-  /** Task 5 swaps this stub for the real cinematic system. */
-  cinematicPlayer: CinematicPlayer
 
   constructor(
     private readonly game: Game,
     private readonly followCamera: FollowCamera,
+    private readonly cinematicCamera: CinematicCamera,
     private readonly choicePanel: ChoicePanel,
     private readonly bubble: SophieBubble,
     private readonly actors: StoryActors,
     mission: StoryMission,
   ) {
     this.mission = mission
-    this.cinematicPlayer = (scene, done) => this.playCinematicStub(scene, done)
   }
 
   get isActive(): boolean {
@@ -63,6 +61,10 @@ export class StoryEngine {
   start(): void {
     if (this.active) return
     this.active = true
+    // Invalidate any continuation still pending from a previous run
+    // (e.g. the final line's bubble timer when Bruno is tapped again).
+    this.generation++
+    this.bubble.hideNow()
     console.log(`[Story] mission "${this.mission.mission}" started`)
     this.runScene(this.mission.scenes[0].id)
   }
@@ -89,13 +91,17 @@ export class StoryEngine {
       return this.finish()
     }
     console.log(`[Story] scene: ${scene.id} (${scene.type})`)
-    this.applyCamera(scene.camera)
     if (scene.type === 'choice') this.runChoice(scene)
     else this.runCinematic(scene)
   }
 
   private runChoice(scene: ChoiceScene): void {
     this.game.states.transition('CHOICE')
+    // Hand the camera back to the follow rig; its damped lerp eases the
+    // view over from wherever the last shot left it — no cuts.
+    this.cinematicCamera.stop()
+    this.followCamera.setEnabled(true)
+    this.applyChoiceCamera(scene.camera)
     this.choicePanel.show(
       {
         promptIcon: iconFor(scene.prompt?.icon),
@@ -126,11 +132,19 @@ export class StoryEngine {
   private runCinematic(scene: CinematicScene): void {
     this.game.states.transition('CINEMATIC')
     if (scene.bruno_state) this.applyBrunoState(scene.bruno_state)
-    this.cinematicPlayer(scene, () => this.runScene(scene.next))
+    const gen = this.generation
+
+    // Controls are already locked (state gate); take the camera and tween
+    // slowly into the staged shot, then play the actions.
+    this.followCamera.setEnabled(false)
+    this.cinematicCamera.play(this.parsePreset(scene.camera)).then(() => {
+      if (gen !== this.generation) return
+      this.playActions(scene, () => this.runScene(scene.next))
+    })
   }
 
-  /** Grey-phase cinematic: log anims, speak lines, then continue. */
-  private playCinematicStub(scene: CinematicScene, done: () => void): void {
+  /** Anim stubs are logged; lines go through Sophie's bubble. */
+  private playActions(scene: CinematicScene, done: () => void): void {
     const actions = [...scene.actions]
     const gen = this.generation
     const step = () => {
@@ -148,12 +162,30 @@ export class StoryEngine {
     step()
   }
 
-  private applyCamera(preset: string | undefined): void {
-    // Grey-phase presets: "closeup_<actor>" focuses that actor, anything
-    // else returns to the follow view. Task 5 adds true cinematic presets.
+  /**
+   * Story JSON camera strings → cinematic presets:
+   * "wide", "closeup_<actor>", "over_shoulder_<actor>" (default actor: bruno).
+   */
+  private parsePreset(raw: string | undefined): CinematicPreset {
+    const fallback = this.actors.resolve('bruno') ?? this.game.sophie
+    if (raw?.startsWith('closeup_')) {
+      return { kind: 'closeup', actor: this.actors.resolve(raw.slice(8)) ?? fallback }
+    }
+    if (raw?.startsWith('over_shoulder')) {
+      const actorId = raw.replace(/^over_shoulder_?/, '')
+      return {
+        kind: 'over_shoulder',
+        actor: (actorId && this.actors.resolve(actorId)) || fallback,
+        companion: this.game.sophie,
+      }
+    }
+    return { kind: 'wide', actor: fallback }
+  }
+
+  /** CHOICE scenes use the softer follow-camera focus ease-in. */
+  private applyChoiceCamera(preset: string | undefined): void {
     if (preset?.startsWith('closeup_')) {
-      const actor = this.actors.resolve(preset.slice('closeup_'.length))
-      this.followCamera.focusOn(actor)
+      this.followCamera.focusOn(this.actors.resolve(preset.slice(8)))
     } else {
       this.followCamera.focusOn(null)
     }
@@ -176,7 +208,9 @@ export class StoryEngine {
   private finish(): void {
     this.active = false
     this.choicePanel.hide()
+    this.cinematicCamera.stop()
     this.followCamera.focusOn(null)
+    this.followCamera.setEnabled(true) // eases home from the last shot
     this.game.states.transition('EXPLORE')
     console.log('[Story] segment complete — back to exploration')
   }
