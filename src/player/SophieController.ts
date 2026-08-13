@@ -30,6 +30,8 @@ export class SophieController {
   onInput: (() => void) | null = null
   /** Interaction system gets first look at taps; true = tap consumed. */
   tapInterceptor: ((raycaster: THREE.Raycaster) => boolean) | null = null
+  /** Notified on Idle/Walk/Run changes (drives GLB clips once loaded). */
+  onAnimChange: ((state: AnimState) => void) | null = null
 
   constructor(private readonly game: Game) {
     game.renderer.domElement.addEventListener('pointerdown', (e) => {
@@ -109,6 +111,8 @@ export class SophieController {
     if (this.anim === next) return
     this.anim = next
     console.log(`[Anim] Sophie -> ${next}`)
+    this.onAnimChange?.(next)
+    // Grey-phase tint stub — harmless no-op once the GLB replaces the capsule.
     const body = this.game.sophie.getObjectByName('sophie-body') as THREE.Mesh | null
     if (body) {
       const mat = body.material as THREE.MeshStandardMaterial

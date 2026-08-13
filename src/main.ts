@@ -1,6 +1,7 @@
 import { Game } from './core/Game'
 import { Mood } from './core/Mood'
 import { SophieController } from './player/SophieController'
+import { SophieView } from './player/SophieView'
 import { FollowCamera } from './camera/FollowCamera'
 import { CinematicCamera } from './camera/CinematicCamera'
 import { InteractionSystem } from './interaction/InteractionSystem'
@@ -28,6 +29,9 @@ if (!container) throw new Error('Missing #app container')
 const game = new Game(container)
 
 const controller = new SophieController(game)
+const sophieView = new SophieView(game.sophie)
+sophieView.load('/assets/sophie.glb') // async; capsule stays if it fails
+controller.onAnimChange = (state) => sophieView.play(state)
 const followCamera = new FollowCamera(game.camera, game.sophie)
 const cinematicCamera = new CinematicCamera(game.camera)
 const interaction = new InteractionSystem(game)
@@ -87,6 +91,7 @@ const story = new StoryEngine(
       resolve: (actorId) =>
         actorId === 'sophie' ? game.sophie : game.scene.getObjectByName(actorId) ?? null,
     },
+    playActorAnim: (actorId, anim) => (actorId === 'sophie' ? sophieView.play(anim) : false),
   },
   brunoMission as StoryMission,
 )
@@ -102,6 +107,7 @@ interaction.add({
 })
 
 game.addUpdatable((dt) => controller.update(dt))
+game.addUpdatable((dt) => sophieView.update(dt))
 game.addUpdatable((dt, elapsed) => interaction.update(dt, elapsed))
 game.addUpdatable((dt) => followCamera.update(dt))
 game.addUpdatable((dt) => cinematicCamera.update(dt))
@@ -118,6 +124,7 @@ declare global {
     game: Game
     sophieDebug: {
       controller: SophieController
+      sophieView: SophieView
       followCamera: FollowCamera
       cinematicCamera: CinematicCamera
       interaction: InteractionSystem
@@ -134,6 +141,7 @@ declare global {
 window.game = game
 window.sophieDebug = {
   controller,
+  sophieView,
   followCamera,
   cinematicCamera,
   interaction,

@@ -37,6 +37,8 @@ export interface StoryEngineDeps {
   brunoView: BrunoView
   mood: Mood
   actors: StoryActors
+  /** Play a named animation clip on an actor; false = not handled (stub). */
+  playActorAnim?: (actorId: string, anim: string) => boolean
 }
 
 /** Minigame option id → world interactable id. */
@@ -412,11 +414,17 @@ export class StoryEngine {
       }
       if (action.move) {
         console.log(`[Stage] ${action.actor} move "${action.move}" (stub)`)
+        // A move can carry its own clip (e.g. Sophie walks in playing Walk).
+        if (action.actor && action.anim) this.deps.playActorAnim?.(action.actor, action.anim)
         window.setTimeout(step, 600)
         return
       }
       if (action.anim) {
-        console.log(`[Cinematic] ${action.actor ?? action.prop ?? 'stage'} plays anim "${action.anim}"`)
+        const actorId = action.actor ?? action.prop ?? 'stage'
+        const played = action.actor
+          ? this.deps.playActorAnim?.(action.actor, action.anim) === true
+          : false
+        console.log(`[Cinematic] ${actorId} plays anim "${action.anim}"${played ? '' : ' (stub)'}`)
         window.setTimeout(step, 900)
         return
       }
