@@ -38,7 +38,6 @@ const HARMONY = [
 class AudioSystem {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
-  private padWarmGain: GainNode | null = null
   private melodyGain: GainNode | null = null
   private harmonyGain: GainNode | null = null
   private started = false
@@ -112,40 +111,10 @@ class AudioSystem {
     return this.ctx
   }
 
-  /** Тихий пад-фон + шины мелодии/гармонии. */
+  /** Только шины мелодии/гармонии — никаких непрерывных падов. */
   private buildAmbient(): void {
     const ctx = this.ctx
     if (!ctx || !this.master) return
-
-    const pad = (freqs: number[], type: OscillatorType, cutoff: number) => {
-      const gain = ctx.createGain()
-      const filter = ctx.createBiquadFilter()
-      filter.type = 'lowpass'
-      filter.frequency.value = cutoff
-      filter.connect(gain)
-      gain.connect(this.master as GainNode)
-      for (const f of freqs) {
-        const osc = ctx.createOscillator()
-        osc.type = type
-        osc.frequency.value = f
-        osc.detune.value = (Math.random() - 0.5) * 6
-        osc.connect(filter)
-        osc.start()
-      }
-      const lfo = ctx.createOscillator()
-      lfo.frequency.value = 0.05
-      const lfoGain = ctx.createGain()
-      lfoGain.gain.value = cutoff * 0.25
-      lfo.connect(lfoGain)
-      lfoGain.connect(filter.frequency)
-      lfo.start()
-      return gain
-    }
-
-    const base = pad([110, 220], 'triangle', 380) // тихая основа A2+A3
-    base.gain.value = 0.22
-    this.padWarmGain = pad([277.2, 329.6], 'sine', 650) // C#4+E4 тепло
-    this.padWarmGain.gain.value = 0
 
     this.melodyGain = ctx.createGain()
     this.melodyGain.gain.value = 0.85
@@ -201,23 +170,16 @@ class AudioSystem {
   setMood(music: string): void {
     this.pendingMood = (music as MoodMusic) ?? 'ambient_calm'
     const ctx = this.ctx
-    if (!ctx || !this.padWarmGain || !this.harmonyGain) return
+    if (!ctx || !this.harmonyGain) return
     const t = ctx.currentTime
     const ramp = (g: GainNode, v: number) => {
       g.gain.cancelScheduledValues(t)
       g.gain.setValueAtTime(g.gain.value, t)
       g.gain.linearRampToValueAtTime(v, t + 4)
     }
-    if (music === 'ambient_warm_lift') {
-      ramp(this.padWarmGain, 0.26)
-      ramp(this.harmonyGain, 0.9)
-    } else if (music === 'ambient_warm') {
-      ramp(this.padWarmGain, 0.28)
-      ramp(this.harmonyGain, 0.6)
-    } else {
-      ramp(this.padWarmGain, 0)
-      ramp(this.harmonyGain, 0)
-    }
+    if (music === 'ambient_warm_lift') ramp(this.harmonyGain, 0.9)
+    else if (music === 'ambient_warm') ramp(this.harmonyGain, 0.6)
+    else ramp(this.harmonyGain, 0)
   }
 
   /** Короткий мягкий тон с плавной атакой (без щелчков). */
