@@ -1,22 +1,27 @@
-"""Bruno для Sophie & Friends — генератор модели + рига + 9 клипов.
+"""Bruno для Sophie & Friends — модель + риг + 9 клипов. Blender 5.x.
 
-КАК СМОТРЕТЬ САМОМУ (GUI):
-    /Applications/Blender.app/Contents/MacOS/Blender --python "tools/blender/build_bruno.py"
-  Откроется Blender с собранным Бруно (rest pose).
-  Анимации: выбери Bruno_Rig -> редактор NLA -> включи "солнышко" (solo)
-  на нужном треке (IdleSad, Walk, ...) -> пробел = play.
+ДЛЯ ПРОСМОТРА В ОТКРЫТОМ BLENDER (твой режим):
+  Вкладка Scripting -> Text -> Open -> этот файл -> Run Script (▶).
+  Скрипт НЕ трогает остальную сцену: всё строится в коллекцию "Bruno",
+  при повторном запуске старый Бруно удаляется и собирается заново —
+  правь числа и жми Run снова.
+  Анимации: выбери Bruno_Rig -> редактор NLA -> solo (звёздочка) на треке
+  (IdleSad, Walk, SmallWave, ...) -> пробел = play.
 
-ЭКСПОРТ В GLB + ПРЕВЬЮ (headless, запускаю я после одобрения):
-    /Applications/Blender.app/Contents/MacOS/Blender --background --python "tools/blender/build_bruno.py"
+ЭКСПОРТ (headless, запускается отдельно):
+  /Applications/Blender.app/Contents/MacOS/Blender --background --python tools/blender/build_bruno.py
+  -> public/assets/bruno.glb + tools/blender/preview_bruno.png
 
-Референс: docs/01 + арт заказчика — высокий светло-голубой блоб: голова и
-тело одним куском (шире сверху), одно большое веко-око с бликом, кремовые
-веснушки на щеках, мягкий рот с одним клыком вниз, уши-рожки по бокам,
-розовая кепка с козырьком, длинные висячие руки с ладошками, короткие ноги
-в массивных зелёных кедах. Морда в +Y (как у Софи; движок разворачивает).
+ГДЕ ЧТО КРУТИТЬ:
+  COL        — все цвета (sRGB 0-255)
+  ELS        — силуэт тела (metaball: центры и радиусы, поверхность ~0.75*r)
+  Секция "детали" — глаз/уши/кепка/веснушки/рот/клык/руки/кеды;
+                    всё лицевое садится на поверхность рейкастом (surf_y).
 
-Клипы: IdleSad, IdleOpen, Walk, HandToChest, SmallWave, SitAlone,
-TryJoinClumsy, TryAgainSucceed, PlayIncluded
+Референс: высокий светло-голубой блоб, голова = половина роста, одно
+огромное око с бликами, кремовые веснушки, широкая мягкая улыбка с одним
+клыком, острые уши-рожки, розовая кепка набекрень, длиннющие висячие руки,
+зелёные кеды с белым носком/подошвой/полосками. Морда в +Y.
 """
 
 import math
@@ -24,6 +29,7 @@ import os
 import struct
 import json as jsonlib
 
+import bmesh
 import bpy
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -31,7 +37,8 @@ OUT_GLB = os.path.join(ROOT, 'public', 'assets', 'bruno.glb')
 OUT_PREVIEW = os.path.join(ROOT, 'tools', 'blender', 'preview_bruno.png')
 HEADLESS = bpy.app.background
 
-FPS = 24
+CLIP_NAMES = ['IdleSad', 'IdleOpen', 'Walk', 'HandToChest', 'SmallWave',
+              'SitAlone', 'TryJoinClumsy', 'TryAgainSucceed', 'PlayIncluded']
 
 
 def srgb(r, g, b):
@@ -39,21 +46,65 @@ def srgb(r, g, b):
 
 
 COL = {
-    'body': srgb(126, 188, 230),     # яркий небесно-голубой (как в арте)
-    'freckle': srgb(246, 233, 183),  # кремовые веснушки
-    'cap': srgb(228, 138, 190),      # розовая кепка
-    'shoe': srgb(52, 150, 84),       # зелёные кеды
-    'shoe_trim': srgb(240, 244, 240),
-    'eye': srgb(244, 244, 240),
-    'pupil': srgb(30, 34, 44),
+    'body': srgb(118, 182, 228),
+    'freckle': srgb(246, 233, 183),
+    'cap': srgb(228, 138, 190),
+    'shoe': srgb(58, 148, 82),
+    'shoe_trim': srgb(242, 246, 242),
+    'eye': srgb(245, 245, 241),
+    'pupil': srgb(28, 32, 42),
     'highlight': srgb(255, 255, 255),
-    'mouth': srgb(38, 48, 72),
+    'mouth': srgb(36, 46, 70),
     'fang': srgb(248, 246, 238),
 }
 
-bpy.ops.wm.read_factory_settings(use_empty=True)
+# Силуэт: широченная голова (половина роста), плавное сужение вниз.
+ELS = [((0, 0, 1.85), 0.85),
+       ((0, 0, 1.45), 0.75),
+       ((0, 0, 1.00), 0.62),
+       ((0, 0, 0.65), 0.55),
+       ((0, 0, 0.48), 0.44)]
+
+# ------------------------------------------------------------ подготовка
+if HEADLESS:
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+
 scene = bpy.context.scene
-scene.render.fps = FPS
+scene.render.fps = 24
+
+# Убрать предыдущего Бруно (повторные запуски в GUI).
+old = bpy.data.collections.get('Bruno')
+if old:
+    for o in list(old.objects):
+        bpy.data.objects.remove(o, do_unlink=True)
+    bpy.data.collections.remove(old)
+for act in list(bpy.data.actions):
+    if act.name.startswith('BR_'):
+        bpy.data.actions.remove(act)
+for blocks in (bpy.data.meshes, bpy.data.materials, bpy.data.metaballs,
+               bpy.data.armatures):
+    for db in list(blocks):
+        if db.users == 0 and (db.name.startswith('Bruno') or
+                              db.name.startswith('BR_')):
+            blocks.remove(db)
+
+bruno_col = bpy.data.collections.new('Bruno')
+scene.collection.children.link(bruno_col)
+
+
+def _find_layer(lc, col):
+    if lc.collection == col:
+        return lc
+    for c in lc.children:
+        r = _find_layer(c, col)
+        if r:
+            return r
+    return None
+
+
+lc = _find_layer(bpy.context.view_layer.layer_collection, bruno_col)
+if lc:
+    bpy.context.view_layer.active_layer_collection = lc
 
 _mats = {}
 
@@ -74,11 +125,11 @@ def smooth(obj):
         p.use_smooth = True
 
 
-def sphere(name, r, loc, scale=(1, 1, 1), key='body', rot=(0, 0, 0), seg=28):
+def sphere(name, r, loc, scale=(1, 1, 1), key='body', rot=(0, 0, 0), seg=32):
     bpy.ops.mesh.primitive_uv_sphere_add(radius=r, location=loc, rotation=rot,
                                          segments=seg, ring_count=seg // 2)
     o = bpy.context.active_object
-    o.name = name
+    o.name = f'BR_{name}'
     o.scale = scale
     o.data.materials.append(mat(key))
     smooth(o)
@@ -88,168 +139,200 @@ def sphere(name, r, loc, scale=(1, 1, 1), key='body', rot=(0, 0, 0), seg=28):
 def rbox(name, size, loc, key, rot=(0, 0, 0), bevel=0.03):
     bpy.ops.mesh.primitive_cube_add(size=1, location=loc, rotation=rot)
     o = bpy.context.active_object
-    o.name = name
+    o.name = f'BR_{name}'
     o.scale = size
     o.data.materials.append(mat(key))
     b = o.modifiers.new('Bevel', 'BEVEL')
-    b.width = bevel
+    b.width = 0.25
     b.segments = 3
     smooth(o)
     return o
 
 
-parts = []  # (объект, кость) — жёсткая привязка
+parts = []
 
-# ---------------------------------------------------------- тело-голова блоб
-# Metaball даёт цельный "мармеладный" силуэт: широкая голова, плавное
-# сужение вниз (без "талии" — элементы сильно перекрываются).
+# ------------------------------------------------------- тело-голова (блоб)
 bpy.ops.object.metaball_add(type='BALL', location=(0, 0, 0))
 mball = bpy.context.active_object
-mball.data.resolution = 0.05
-els = [((0, 0, 1.62), 0.64), ((0, 0, 1.25), 0.52),
-       ((0, 0, 0.92), 0.47), ((0, 0, 0.68), 0.43)]
-el0 = mball.data.elements[0]
-el0.co, el0.radius = els[0]
-for co, r in els[1:]:
+mball.data.resolution = 0.042
+e0 = mball.data.elements[0]
+e0.co, e0.radius = ELS[0]
+for co, r in ELS[1:]:
     e = mball.data.elements.new()
     e.co = co
     e.radius = r
 bpy.ops.object.convert(target='MESH')
 blob = bpy.context.active_object
-blob.name = 'Body'
+blob.name = 'BR_Body'
 blob.data.materials.append(mat('body'))
+sm = blob.modifiers.new('Smooth', 'SMOOTH')
+sm.factor = 1.0
+sm.iterations = 6
 smooth(blob)
 
 
 def surf_y(x, z):
-    """Y поверхности блоба (морда, +Y) в точке (x, z) — рейкаст внутрь."""
-    hit, loc, _n, _i = blob.ray_cast((x, 3.0, z), (0, -1, 0))
-    return loc.y if hit else 0.45
+    hit, loc, _n, _i = blob.ray_cast((x, 4.0, z), (0, -1, 0))
+    return loc.y if hit else 0.5
 
 
 def surf_x(z, y=0.0):
-    hit, loc, _n, _i = blob.ray_cast((3.0, y, z), (-1, 0, 0))
-    return loc.x if hit else 0.5
+    hit, loc, _n, _i = blob.ray_cast((4.0, y, z), (-1, 0, 0))
+    return loc.x if hit else 0.55
 
 
 def top_z():
-    hit, loc, _n, _i = blob.ray_cast((0, 0, 4.0), (0, 0, -1))
-    return loc.z if hit else 2.2
+    hit, loc, _n, _i = blob.ray_cast((0, 0, 5.0), (0, 0, -1))
+    return loc.z if hit else 2.45
 
-# ------------------------------------------------------------------- детали
+
 Z_TOP = top_z()
 
-# Уши-рожки по бокам, ниже кепки, торчат заметно наружу-вверх.
+# ------------------------------------------------------------------ детали
+# Острые уши-рожки: торчат вбок-вверх из-под краёв кепки, заметные.
 for side, sx in (('L', 1), ('R', -1)):
-    ex = surf_x(1.88, y=-0.03)
-    ear = sphere(f'Ear.{side}', 1.0, (sx * (ex + 0.04), -0.03, 1.90),
-                 scale=(0.15, 0.11, 0.26), rot=(0, sx * 1.25, 0))
+    bpy.ops.mesh.primitive_cone_add(radius1=0.17, radius2=0.015, depth=0.46,
+                                    location=(sx * 0.42, -0.02, Z_TOP - 0.30),
+                                    rotation=(0, sx * 0.85, 0), vertices=16)
+    ear = bpy.context.active_object
+    ear.name = f'BR_Ear.{side}'
+    ear.data.materials.append(mat('body'))
+    ss = ear.modifiers.new('Subsurf', 'SUBSURF')
+    ss.levels = 2
+    ss.render_levels = 2
+    smooth(ear)
     parts.append((ear, 'head'))
 
-# Один большой глаз (утоплен в поверхность, чуть выпуклый) + зрачок + блик.
-EYE_Z = 1.66
-eye_y = surf_y(0, EYE_Z) - 0.075
-eye = sphere('Eye', 0.21, (0, eye_y, EYE_Z), scale=(1, 0.55, 1))
+# Огромное око: белок (вертикальный овал), зрачок, два блика.
+EYE_Z = 1.80
+eye_y = surf_y(0, EYE_Z) - 0.10
+eye = sphere('Eye', 0.26, (0, eye_y, EYE_Z), scale=(0.92, 0.55, 1.08))
 eye.data.materials.clear()
 eye.data.materials.append(mat('eye', roughness=0.3))
 parts.append((eye, 'head'))
-pupil_y = eye_y + 0.21 * 0.55 - 0.030
-pupil = sphere('Pupil', 0.095, (0, pupil_y, EYE_Z), scale=(1, 0.45, 1))
+pupil_y = eye_y + 0.26 * 0.55 - 0.035
+pupil = sphere('Pupil', 0.13, (0, pupil_y, EYE_Z - 0.01), scale=(0.95, 0.45, 1.1))
 pupil.data.materials.clear()
 pupil.data.materials.append(mat('pupil', roughness=0.35))
 parts.append((pupil, 'head'))
-gleam = sphere('Gleam', 0.026, (0.042, pupil_y + 0.036, EYE_Z + 0.045), seg=12)
-gleam.data.materials.clear()
-gleam.data.materials.append(mat('highlight', roughness=0.2))
-parts.append((gleam, 'head'))
+for gname, gx, gz, gr in (('Gleam1', 0.055, EYE_Z + 0.07, 0.034),
+                          ('Gleam2', -0.035, EYE_Z - 0.075, 0.018)):
+    g = sphere(gname, gr, (gx, pupil_y + 0.05, gz), seg=12)
+    g.data.materials.clear()
+    g.data.materials.append(mat('highlight', roughness=0.2))
+    parts.append((g, 'head'))
 
-# Кремовые веснушки — по 4 на щёку, лежат на поверхности.
-freckles = [(0.24, 1.57, 0.046), (0.32, 1.62, 0.037),
-            (0.28, 1.49, 0.031), (0.36, 1.53, 0.041)]
+# Кремовые веснушки — 4 на каждую щёку, сидят на поверхности.
+freckles = [(0.30, 1.62, 0.052), (0.40, 1.68, 0.042),
+            (0.34, 1.52, 0.036), (0.44, 1.56, 0.047)]
 for i, (fx, fz, fr) in enumerate(freckles):
     for sx in (1, -1):
         fy = surf_y(sx * fx, fz) - fr * 0.35
-        f = sphere(f'Freckle{i}{"LR"[sx < 0]}', fr, (sx * fx, fy, fz), seg=12)
+        f = sphere(f'Freckle{i}{"LR"[sx < 0]}', fr, (sx * fx, fy, fz), seg=14)
         f.data.materials.clear()
         f.data.materials.append(mat('freckle'))
         parts.append((f, 'head'))
 
-# Мягкий рот-линия + один клык вниз — на поверхности мордочки.
-MOUTH_Z = 1.44
-mouth_y = surf_y(0, MOUTH_Z) - 0.006
-mouth = sphere('Mouth', 1.0, (0, mouth_y, MOUTH_Z), scale=(0.15, 0.028, 0.022))
-mouth.data.materials.clear()
+# Широкая мягкая улыбка — нижняя половина тонкого тора (дуга), + клык.
+MOUTH_Z = 1.42
+bpy.ops.mesh.primitive_torus_add(major_radius=0.19, minor_radius=0.016,
+                                 location=(0, 0, 0),
+                                 major_segments=32, minor_segments=8)
+mouth = bpy.context.active_object
+mouth.name = 'BR_Mouth'
+me = mouth.data
+bm = bmesh.new()
+bm.from_mesh(me)
+doomed = [v for v in bm.verts if v.co.y > 0.015]
+bmesh.ops.delete(bm, geom=doomed, context='VERTS')
+bm.to_mesh(me)
+bm.free()
+mouth.rotation_euler = (math.radians(90), 0, 0)
+mouth.scale = (1.0, 1.0, 0.5)  # z после поворота = глубина дуги
+mouth_y = surf_y(0, MOUTH_Z) - 0.012
+mouth.location = (0, mouth_y, MOUTH_Z)
 mouth.data.materials.append(mat('mouth'))
+smooth(mouth)
 parts.append((mouth, 'head'))
-fang_y = surf_y(0.06, 1.37) - 0.01
-bpy.ops.mesh.primitive_cone_add(radius1=0.036, radius2=0.008, depth=0.10,
-                                location=(0.06, fang_y, 1.365),
-                                rotation=(math.pi, 0, 0), vertices=10)
+
+fang_x = 0.075
+fang_y = surf_y(fang_x, MOUTH_Z - 0.05) - 0.005
+bpy.ops.mesh.primitive_cone_add(radius1=0.042, radius2=0.01, depth=0.12,
+                                location=(fang_x, fang_y, MOUTH_Z - 0.105),
+                                rotation=(math.pi, 0, 0), vertices=12)
 fang = bpy.context.active_object
-fang.name = 'Fang'
+fang.name = 'BR_Fang'
 fang.data.materials.append(mat('fang'))
 smooth(fang)
 parts.append((fang, 'head'))
 
-# Розовая кепка — облегает макушку, лёгкий наклон, скромный козырёк.
-cap = sphere('Cap', 0.48, (0, 0.02, Z_TOP - 0.02),
-             scale=(0.95, 0.95, 0.50), rot=(-0.05, 0.08, 0))
+# Розовая кепка набекрень между ушами + козырёк.
+CAP_TILT = 0.20  # наклон вправо
+cap = sphere('Cap', 0.50, (0.06, 0.0, Z_TOP + 0.01),
+             scale=(0.92, 0.92, 0.50), rot=(-0.06, CAP_TILT, 0))
 cap.data.materials.clear()
 cap.data.materials.append(mat('cap'))
 parts.append((cap, 'head'))
-brim_y = surf_y(0, Z_TOP - 0.12) + 0.10
-bpy.ops.mesh.primitive_cylinder_add(radius=0.20, depth=0.04,
-                                    location=(0, brim_y, Z_TOP - 0.10),
-                                    rotation=(0.13, 0, 0), vertices=20)
+brim_y = surf_y(0.1, Z_TOP - 0.10) + 0.14
+bpy.ops.mesh.primitive_cylinder_add(radius=0.21, depth=0.045,
+                                    location=(0.13, brim_y, Z_TOP - 0.06),
+                                    rotation=(0.12, CAP_TILT * 0.5, 0), vertices=24)
 brim = bpy.context.active_object
-brim.name = 'CapBrim'
+brim.name = 'BR_CapBrim'
 brim.scale = (1.35, 1.0, 1.0)
 brim.data.materials.append(mat('cap'))
 smooth(brim)
 parts.append((brim, 'head'))
 
-# Длинные висячие руки, прижаты к телу, ладошки перекрываются с рукой.
+# Длиннющие висячие руки с ладошками, чуть в сторону от тела.
 for side, sx in (('L', 1), ('R', -1)):
-    ax = surf_x(1.20) + 0.015
-    armo = sphere(f'Arm.{side}', 1.0, (sx * ax, 0, 1.00),
-                  scale=(0.085, 0.085, 0.52), rot=(0, sx * 0.05, 0))
+    ax = surf_x(1.30) - 0.01
+    armo = sphere(f'Arm.{side}', 1.0, (sx * (ax + 0.03), 0, 1.00),
+                  scale=(0.09, 0.09, 0.62), rot=(0, sx * 0.09, 0))
     parts.append((armo, f'arm.{side}'))
-    hand = sphere(f'Hand.{side}', 1.0, (sx * (ax + 0.03), 0.02, 0.54),
-                  scale=(0.105, 0.085, 0.145))
+    hand = sphere(f'Hand.{side}', 1.0, (sx * (ax + 0.10), 0.02, 0.42),
+                  scale=(0.115, 0.09, 0.16))
     parts.append((hand, f'arm.{side}'))
 
-# Короткие ноги + массивные кеды (подошва + белый носок).
+# Кеды прямо под телом; короткие стопы-переходники прячутся под корпусом.
 for side, sx in (('L', 1), ('R', -1)):
-    leg = sphere(f'Leg.{side}', 1.0, (sx * 0.17, 0, 0.38),
-                 scale=(0.10, 0.10, 0.23))
-    parts.append((leg, f'leg.{side}'))
-    shoe = rbox(f'Shoe.{side}', (0.15, 0.28, 0.105), (sx * 0.17, 0.07, 0.10),
+    ankle = sphere(f'Ankle.{side}', 1.0, (sx * 0.17, 0, 0.24),
+                   scale=(0.10, 0.10, 0.14))
+    parts.append((ankle, f'leg.{side}'))
+    shoe = rbox(f'Shoe.{side}', (0.16, 0.30, 0.11), (sx * 0.17, 0.05, 0.105),
                 'shoe')
     parts.append((shoe, f'leg.{side}'))
-    sole = rbox(f'Sole.{side}', (0.16, 0.30, 0.035), (sx * 0.17, 0.07, 0.028),
-                'shoe_trim', bevel=0.015)
+    sole = rbox(f'Sole.{side}', (0.17, 0.32, 0.038), (sx * 0.17, 0.05, 0.030),
+                'shoe_trim')
     parts.append((sole, f'leg.{side}'))
-    toe = sphere(f'Toe.{side}', 1.0, (sx * 0.17, 0.22, 0.095),
-                 scale=(0.115, 0.09, 0.075))
+    toe = sphere(f'Toe.{side}', 1.0, (sx * 0.17, 0.21, 0.10),
+                 scale=(0.125, 0.10, 0.082))
     toe.data.materials.clear()
     toe.data.materials.append(mat('shoe_trim'))
     parts.append((toe, f'leg.{side}'))
+    for si in range(3):
+        stripe = rbox(f'Stripe{si}.{side}',
+                      (0.014, 0.045, 0.08),
+                      (sx * (0.17 + 0.076), 0.08 - si * 0.065, 0.105),
+                      'shoe_trim', rot=(0, 0, sx * 0.3))
+        parts.append((stripe, f'leg.{side}'))
 
-# ------------------------------------------------------------------- риг
+# --------------------------------------------------------------------- риг
 bpy.ops.object.armature_add(location=(0, 0, 0))
 arm_obj = bpy.context.active_object
 arm_obj.name = 'Bruno_Rig'
+arm_obj.data.name = 'Bruno_RigData'
 bpy.ops.object.mode_set(mode='EDIT')
 eb = arm_obj.data.edit_bones
 eb.remove(eb[0])
 BONES = {
     'root': ((0, 0, 0.05), (0, 0, 0.55), None),
-    'spine': ((0, 0, 0.55), (0, 0, 1.45), 'root'),
-    'head': ((0, 0, 1.45), (0, 0, 2.30), 'spine'),
-    'arm.L': ((0.50, 0, 1.48), (0.56, 0, 0.50), 'spine'),
-    'arm.R': ((-0.50, 0, 1.48), (-0.56, 0, 0.50), 'spine'),
-    'leg.L': ((0.17, 0, 0.50), (0.17, 0, 0.05), 'root'),
-    'leg.R': ((-0.17, 0, 0.50), (-0.17, 0, 0.05), 'root'),
+    'spine': ((0, 0, 0.55), (0, 0, 1.50), 'root'),
+    'head': ((0, 0, 1.50), (0, 0, Z_TOP), 'spine'),
+    'arm.L': ((0.52, 0, 1.45), (0.60, 0, 0.30), 'spine'),
+    'arm.R': ((-0.52, 0, 1.45), (-0.60, 0, 0.30), 'spine'),
+    'leg.L': ((0.18, 0, 0.45), (0.18, 0, 0.05), 'root'),
+    'leg.R': ((-0.18, 0, 0.45), (-0.18, 0, 0.05), 'root'),
 }
 created = {}
 for name, (bhead, tail, parent) in BONES.items():
@@ -262,26 +345,24 @@ for name, (bhead, tail, parent) in BONES.items():
     created[name] = b
 bpy.ops.object.mode_set(mode='OBJECT')
 
-# Блоб: плавный градиент spine->head по высоте, чтобы наклон головы
-# органично гнул верх тела (а не отрывал детали от туловища).
 vg_spine = blob.vertex_groups.new(name='spine')
 vg_head = blob.vertex_groups.new(name='head')
 for v in blob.data.vertices:
-    t = (v.co.z - 1.15) / (1.75 - 1.15)
+    t = (v.co.z - 1.30) / (1.75 - 1.30)
     t = max(0.0, min(1.0, t))
     if t < 1.0:
         vg_spine.add([v.index], 1.0 - t, 'REPLACE')
     if t > 0.0:
         vg_head.add([v.index], t, 'REPLACE')
-mod = blob.modifiers.new('Armature', 'ARMATURE')
-mod.object = arm_obj
+m = blob.modifiers.new('Armature', 'ARMATURE')
+m.object = arm_obj
 blob.parent = arm_obj
 
 for obj, bone in parts:
     vg = obj.vertex_groups.new(name=bone)
     vg.add(list(range(len(obj.data.vertices))), 1.0, 'REPLACE')
-    m = obj.modifiers.new('Armature', 'ARMATURE')
-    m.object = arm_obj
+    am = obj.modifiers.new('Armature', 'ARMATURE')
+    am.object = arm_obj
     obj.parent = arm_obj
 
 for pb in arm_obj.pose.bones:
@@ -317,7 +398,7 @@ S_ARM = pitch_sign('arm.R')
 S_LEG = pitch_sign('leg.R')
 print(f'[signs] head={S_HEAD} spine={S_SPINE} arm={S_ARM} leg={S_LEG}')
 
-# ------------------------------------------------------------------ клипы
+# ------------------------------------------------------------------- клипы
 arm_obj.animation_data_create()
 
 
@@ -333,21 +414,19 @@ def kf(bone, frame, pitch=None, roll=None, loc_z=None):
         pb.keyframe_insert('location', frame=frame)
 
 
-CLIPS = {}
-
-
-def begin_clip(name, last):
+def begin_clip(last):
     reset_pose()
     arm_obj.animation_data.action = None
     scene.frame_start = 1
     scene.frame_end = last
-    CLIPS[name] = last
 
 
 def end_clip(name):
+    """Action получает префикс BR_ (чтобы не задеть экшены Софи в твоём
+    файле), а NLA-трек — точное имя клипа: glTF берёт имя из трека."""
     act = arm_obj.animation_data.action
     assert act is not None, f'no action for {name}'
-    act.name = name
+    act.name = f'BR_{name}'
     act.use_fake_user = True
     track = arm_obj.animation_data.nla_tracks.new()
     track.name = name
@@ -360,7 +439,7 @@ def end_clip(name):
     arm_obj.animation_data.action = None
 
 
-begin_clip('IdleSad', 72)
+begin_clip(72)
 for f in (1, 72):
     kf('spine', f, pitch=0.16 * S_SPINE)
     kf('root', f, loc_z=-0.03)
@@ -372,7 +451,7 @@ kf('head', 72, pitch=0.38 * S_HEAD)
 kf('spine', 36, pitch=0.19 * S_SPINE)
 end_clip('IdleSad')
 
-begin_clip('IdleOpen', 72)
+begin_clip(72)
 kf('head', 1, pitch=-0.06 * S_HEAD)
 kf('head', 72, pitch=-0.06 * S_HEAD)
 kf('spine', 1, pitch=-0.04 * S_SPINE, roll=0.03)
@@ -384,22 +463,22 @@ kf('arm.L', 72, roll=0.10)
 kf('arm.R', 72, roll=-0.10)
 end_clip('IdleOpen')
 
-begin_clip('Walk', 24)
+begin_clip(24)
 for f, a in ((1, 0.45), (13, -0.45), (24, 0.45)):
     kf('leg.L', f, pitch=a * S_LEG)
     kf('leg.R', f, pitch=-a * S_LEG)
-    kf('arm.L', f, pitch=-a * 0.45 * S_ARM)
-    kf('arm.R', f, pitch=a * 0.45 * S_ARM)
+    kf('arm.L', f, pitch=-a * 0.35 * S_ARM)
+    kf('arm.R', f, pitch=a * 0.35 * S_ARM)
 for f, z in ((1, -0.015), (7, 0.02), (13, -0.015), (19, 0.02), (24, -0.015)):
     kf('root', f, loc_z=z)
 kf('spine', 1, pitch=0.05 * S_SPINE)
 kf('spine', 24, pitch=0.05 * S_SPINE)
 end_clip('Walk')
 
-begin_clip('HandToChest', 48)
+begin_clip(48)
 kf('arm.R', 1, pitch=0.0)
-kf('arm.R', 16, pitch=1.35 * S_ARM, roll=0.55)
-kf('arm.R', 48, pitch=1.35 * S_ARM, roll=0.55)
+kf('arm.R', 16, pitch=1.15 * S_ARM, roll=0.5)
+kf('arm.R', 48, pitch=1.15 * S_ARM, roll=0.5)
 kf('head', 1, pitch=0.30 * S_HEAD)
 kf('head', 28, pitch=0.10 * S_HEAD)
 kf('head', 48, pitch=0.10 * S_HEAD)
@@ -407,29 +486,29 @@ kf('spine', 1, pitch=0.12 * S_SPINE)
 kf('spine', 48, pitch=0.10 * S_SPINE)
 end_clip('HandToChest')
 
-begin_clip('SmallWave', 48)
+begin_clip(48)
 kf('arm.R', 1, pitch=0.0, roll=0.0)
-kf('arm.R', 10, pitch=2.4 * S_ARM, roll=0.0)
-for f, r in ((16, 0.3), (24, -0.3), (32, 0.3), (40, 0.0)):
-    kf('arm.R', f, pitch=2.4 * S_ARM, roll=r)
-kf('arm.R', 48, pitch=1.2 * S_ARM, roll=0.0)
+kf('arm.R', 10, pitch=2.3 * S_ARM, roll=0.0)
+for f, r in ((16, 0.28), (24, -0.28), (32, 0.28), (40, 0.0)):
+    kf('arm.R', f, pitch=2.3 * S_ARM, roll=r)
+kf('arm.R', 48, pitch=1.1 * S_ARM, roll=0.0)
 kf('head', 1, pitch=0.05 * S_HEAD)
 kf('head', 20, pitch=-0.05 * S_HEAD)
 kf('head', 48, pitch=0.0)
 end_clip('SmallWave')
 
-begin_clip('SitAlone', 60)
+begin_clip(60)
 for f in (1, 60):
-    kf('root', f, loc_z=-0.40)
-    kf('leg.L', f, pitch=1.5 * S_LEG)
-    kf('leg.R', f, pitch=1.5 * S_LEG)
+    kf('root', f, loc_z=-0.32)
+    kf('leg.L', f, pitch=1.4 * S_LEG)
+    kf('leg.R', f, pitch=1.4 * S_LEG)
     kf('spine', f, pitch=0.22 * S_SPINE)
 kf('head', 1, pitch=0.34 * S_HEAD)
 kf('head', 30, pitch=0.40 * S_HEAD)
 kf('head', 60, pitch=0.34 * S_HEAD)
 end_clip('SitAlone')
 
-begin_clip('TryJoinClumsy', 60)
+begin_clip(60)
 kf('spine', 1, pitch=0.10 * S_SPINE, roll=0.0)
 kf('spine', 16, pitch=0.22 * S_SPINE, roll=0.0)
 for f, r in ((24, 0.12), (32, -0.12), (40, 0.06)):
@@ -443,7 +522,7 @@ kf('head', 30, pitch=0.15 * S_HEAD)
 kf('head', 60, pitch=0.05 * S_HEAD)
 end_clip('TryJoinClumsy')
 
-begin_clip('TryAgainSucceed', 60)
+begin_clip(60)
 kf('spine', 1, pitch=0.15 * S_SPINE)
 kf('spine', 30, pitch=0.05 * S_SPINE)
 kf('spine', 60, pitch=0.02 * S_SPINE)
@@ -458,10 +537,10 @@ kf('head', 45, pitch=-0.10 * S_HEAD)
 kf('head', 60, pitch=-0.10 * S_HEAD)
 end_clip('TryAgainSucceed')
 
-begin_clip('PlayIncluded', 48)
+begin_clip(48)
 for f, z in ((1, 0.0), (12, 0.06), (24, 0.0), (36, 0.06), (48, 0.0)):
     kf('root', f, loc_z=z)
-for f, a in ((1, 0.3), (24, -0.3), (48, 0.3)):
+for f, a in ((1, 0.25), (24, -0.25), (48, 0.25)):
     kf('arm.L', f, pitch=a * S_ARM)
     kf('arm.R', f, pitch=-a * S_ARM)
 for f, r in ((1, 0.06), (24, -0.06), (48, 0.06)):
@@ -474,7 +553,7 @@ reset_pose()
 
 # ------------------------------------------------------------- верификация
 rest_head_z = tail_world('head').z
-act = bpy.data.actions['IdleSad']
+act = bpy.data.actions['BR_IdleSad']
 arm_obj.animation_data.action = act
 scene.frame_set(36)
 sad_head_z = tail_world('head').z
@@ -483,10 +562,8 @@ reset_pose()
 scene.frame_set(1)
 print(f'[verify] head z rest={rest_head_z:.3f} IdleSad@36={sad_head_z:.3f} -> '
       f'{"OK" if sad_head_z < rest_head_z - 0.05 else "FAIL"}')
-print('[clips]', ', '.join(sorted(CLIPS.keys())))
 
 if HEADLESS:
-    # ----------------------------------------------------------- экспорт
     os.makedirs(os.path.dirname(OUT_GLB), exist_ok=True)
     for obj in bpy.data.objects:
         obj.select_set(obj.type in {'MESH', 'ARMATURE'})
@@ -506,16 +583,15 @@ if HEADLESS:
     gltf = jsonlib.loads(buf[20:20 + json_len].decode())
     anims = [a.get('name') for a in gltf.get('animations', [])]
     print('[glb] animations:', ', '.join(anims))
-    print('[glb] missing clips:', [c for c in CLIPS if c not in anims] or 'none')
+    print('[glb] missing clips:', [c for c in CLIP_NAMES if c not in anims] or 'none')
 
-    # ----------------------------------------------------------- превью
     for track in arm_obj.animation_data.nla_tracks:
         track.mute = True
     reset_pose()
     scene.frame_set(1)
-    bpy.ops.object.camera_add(location=(2.3, 3.2, 2.3))
+    bpy.ops.object.camera_add(location=(2.5, 3.4, 2.4))
     cam = bpy.context.active_object
-    bpy.ops.object.empty_add(location=(0, 0, 1.25))
+    bpy.ops.object.empty_add(location=(0, 0, 1.3))
     target = bpy.context.active_object
     cam.constraints.new('TRACK_TO').target = target
     scene.camera = cam
@@ -545,9 +621,9 @@ if HEADLESS:
     bpy.ops.render.render(write_still=True)
     print('[preview] wrote', OUT_PREVIEW)
 else:
-    # GUI: rest pose, приятный фон; смотри NLA для клипов.
     for track in arm_obj.animation_data.nla_tracks:
         track.mute = True
     reset_pose()
     scene.frame_set(1)
-    print('GUI mode: модель собрана. NLA -> solo нужного трека -> Play.')
+    print('Бруно собран в коллекцию "Bruno". Правь числа -> Run Script.')
+    print('Клипы: Bruno_Rig -> NLA -> solo трека -> Play.')
