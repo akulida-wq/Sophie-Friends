@@ -30,7 +30,8 @@ const game = new Game(container)
 
 const controller = new SophieController(game)
 const sophieView = new SophieView(game.sophie)
-sophieView.load('/assets/sophie.glb') // async; capsule stays if it fails
+// v-параметр обновлять при замене ассета — сбрасывает кеш браузера.
+sophieView.load('/assets/sophie.glb?v=7') // async; capsule stays if it fails
 controller.onAnimChange = (state) => sophieView.play(state)
 const followCamera = new FollowCamera(game.camera, game.sophie)
 const cinematicCamera = new CinematicCamera(game.camera)

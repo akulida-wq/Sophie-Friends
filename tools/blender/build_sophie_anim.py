@@ -50,10 +50,23 @@ for o in meshes:
 assert len(dog.vertex_groups) > 10, 'у меша нет весов рига Tripo'
 
 # ------------------------------------------------- нормализация ориентации
+# transform_apply в headless тихо фейлится -> запекаем матрицы напрямую
+# через data API (Mesh.transform / Armature.transform), без ops.
+from mathutils import Matrix
+
+
+def bake_world_transform(obj):
+    mw = obj.matrix_world.copy()
+    obj.data.transform(mw)
+    obj.matrix_world = Matrix.Identity(4)
+
+
+_mw = dog.matrix_world.copy()
+dog.parent = None
+dog.matrix_world = _mw
 for o in (arm, dog):
-    o.select_set(True)
-bpy.context.view_layer.objects.active = arm
-bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    bake_world_transform(o)
+bpy.context.view_layer.update()
 
 BONES = {
     'root': 'tripo::Root',
@@ -83,13 +96,86 @@ def bone_world(key, point='head'):
 
 
 # Морду в +Y (наша конвенция; движок делает финальный флип на 180°).
+# Поворачиваем ОБА объекта согласованно и запекаем через data API.
 face_dir = (bone_world('snout') - bone_world('tail1'))
 face_dir.z = 0
 face_dir.normalize()
 angle = math.atan2(face_dir.x, face_dir.y)
-arm.rotation_euler = (0, 0, -angle)
-bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-print(f'[orient] повернул на {math.degrees(-angle):.0f}° -> морда в +Y')
+# Rz(theta) сводит азимут theta к нулю (+Y); знак БЕЗ минуса.
+rot = Matrix.Rotation(angle, 4, 'Z')
+for o in (arm, dog):
+    o.data.transform(rot)
+bpy.context.view_layer.update()
+front_y = bone_world('snout').y
+tail_y = bone_world('tail1').y
+print(f'[orient] повернул на {math.degrees(angle):.0f}°; '
+      f'front y={front_y:.2f} tail y={tail_y:.2f} -> '
+      f'{"OK (морда в +Y)" if front_y > tail_y else "FAIL"}')
+
+# ------------------------------------------------------- перевес скина
+# Авто-скин Tripo фиктивный: ~100% весов на Root (кости машут — шкура
+# стоит). Bone-heat в headless тихо фейлится, поэтому вешаем сами:
+# расстояние вершины до сегмента кости, топ-3 кости, штраф за
+# "чужую сторону" для костей лап (чтобы лапы не перехватывали
+# веса друг друга).
+from mathutils.geometry import intersect_point_line
+
+for vg in list(dog.vertex_groups):
+    dog.vertex_groups.remove(vg)
+for m in list(dog.modifiers):
+    if m.type == 'ARMATURE':
+        dog.modifiers.remove(m)
+
+segments = []  # (bone_name, head, tail, is_leg, side_sign)
+for b in arm.data.bones:
+    if b.name == 'tripo::Root':
+        continue
+    h = b.head_local.copy()
+    t = b.tail_local.copy()
+    is_leg = max(h.z, t.z) < 0.45 and abs((h.x + t.x) / 2) > 0.04
+    side = 1.0 if (h.x + t.x) / 2 >= 0 else -1.0
+    segments.append((b.name, h, t, is_leg, side))
+
+groups = {name: dog.vertex_groups.new(name=name) for name, *_ in segments}
+
+
+def seg_dist(p, a, b):
+    pt, frac = intersect_point_line(p, a, b)
+    frac = max(0.0, min(1.0, frac))
+    closest = a.lerp(b, frac)
+    return (p - closest).length
+
+
+for i, v in enumerate(dog.data.vertices):
+    co = v.co
+    cands = []
+    for name, h, t, is_leg, side in segments:
+        d = seg_dist(co, h, t)
+        if is_leg and co.x * side < -0.01:
+            d *= 1.9  # чужая сторона
+        cands.append((d, name))
+    cands.sort()
+    top = cands[:3]
+    ws = [(1.0 / (d + 0.025)) ** 2 for d, _ in top]
+    total = sum(ws)
+    for (d, name), w in zip(top, ws):
+        wn = w / total
+        if wn > 0.06:
+            groups[name].add([i], wn, 'REPLACE')
+
+mod = dog.modifiers.new('Armature', 'ARMATURE')
+mod.object = arm
+dog.parent = arm
+
+_totals = {}
+for v in dog.data.vertices:
+    for gr in v.groups:
+        nm = dog.vertex_groups[gr.group].name
+        _totals[nm] = _totals.get(nm, 0.0) + gr.weight
+_top = sorted(_totals.items(), key=lambda kv: -kv[1])[:6]
+print('[skin] groups:', len(_totals), 'top:',
+      ', '.join(f'{n}={t:.0f}' for n, t in _top))
+assert len(_totals) > 12, 'перевес скина не удался'
 
 for pb in arm.pose.bones:
     pb.rotation_mode = 'XYZ'
@@ -374,6 +460,42 @@ rest_foot = tail_world_pose('frontA1')
 walk_foot = clip_probe('SP_Walk', 13, 'frontA1')
 print(f'[verify] Walk foot swing: {(walk_foot - rest_foot).length:.3f} -> '
       f'{"OK" if (walk_foot - rest_foot).length > 0.05 else "FAIL"}')
+
+
+def mesh_leg_disp(clip, frame):
+    """Максимальное смещение вершин МЕША в зоне лап (низ) — истинная
+    проверка, что шкура следует за костями."""
+    def sample():
+        dg = bpy.context.evaluated_depsgraph_get()
+        ev = dog.evaluated_get(dg).to_mesh()
+        pts = [(i, v.co.copy()) for i, v in enumerate(ev.data.vertices)
+               if v.co.z < 0.30] if hasattr(ev, 'data') else \
+              [(i, v.co.copy()) for i, v in enumerate(ev.vertices)
+               if v.co.z < 0.30]
+        dog.evaluated_get(dg).to_mesh_clear()
+        return dict(pts)
+
+    reset_pose()
+    scene.frame_set(1)
+    rest = sample()
+    act = bpy.data.actions[clip]
+    arm.animation_data.action = act
+    if hasattr(arm.animation_data, 'action_slot'):
+        try:
+            arm.animation_data.action_slot = act.slots[0]
+        except Exception:
+            pass
+    scene.frame_set(frame)
+    posed = sample()
+    arm.animation_data.action = None
+    reset_pose()
+    scene.frame_set(1)
+    return max((posed[i] - rest[i]).length for i in rest if i in posed)
+
+
+leg_disp = mesh_leg_disp('SP_Walk', 13)
+print(f'[verify] Walk MESH leg displacement: {leg_disp:.3f} -> '
+      f'{"OK" if leg_disp > 0.05 else "FAIL"}')
 
 if HEADLESS:
     for o in bpy.data.objects:
