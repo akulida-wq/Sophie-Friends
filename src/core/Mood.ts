@@ -25,6 +25,9 @@ export class Mood {
   private readonly skyTarget = new THREE.Color(0xffffff)
   private sky: THREE.Mesh | null | undefined
 
+  /** Опциональный слушатель смены температуры (светлячки и т.п.). */
+  onTempChange: ((temp: ColorTemp) => void) | null = null
+
   constructor(private readonly scene: THREE.Scene) {
     this.sun = scene.getObjectByName('sun') as THREE.DirectionalLight | null
     this.bgCurrent.setHex(TEMPS.neutral.bg)
@@ -49,6 +52,7 @@ export class Mood {
     this.bgTarget.setHex(target.bg)
     this.sunTarget.setHex(target.sun)
     this.skyTarget.setHex(target.sky)
+    this.onTempChange?.(temp)
   }
 
   update(dt: number): void {

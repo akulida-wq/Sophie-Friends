@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { Game } from './core/Game'
 import { Mood } from './core/Mood'
+import { Fireflies } from './core/Fireflies'
 import { loadEnvironment, type PropId } from './core/Environment'
 import { SophieController } from './player/SophieController'
 import { SophieView } from './player/SophieView'
@@ -50,6 +51,8 @@ const choicePanel = new ChoicePanel(document.body)
 const bubble = new SophieBubble(document.body)
 const tapCue = new TapCue(document.body, game.camera)
 const mood = new Mood(game.scene)
+const fireflies = new Fireflies(game.scene)
+mood.onTempChange = (temp) => fireflies.setActive(temp === 'warm')
 const rewardGlow = new RewardGlow(document.body)
 new PauseOverlay(document.body, game)
 new SoundToggle(document.body)
@@ -129,6 +132,8 @@ const PLACEHOLDER_PROPS: Record<PropId, [() => THREE.Group, [number, number, num
   chalk: [createChalk, [1.5, 0, -4]],
 }
 
+const swayNodes: THREE.Object3D[] = []
+
 async function bootWorld(): Promise<void> {
   let props: Partial<Record<PropId, THREE.Object3D>> = {}
   try {
@@ -136,6 +141,10 @@ async function bootWorld(): Promise<void> {
     game.scene.getObjectByName('ground')?.removeFromParent() // серый пол долой
     game.scene.add(env.root)
     props = env.props
+    for (const name of ['TreeDeco1', 'TreeDeco2', 'Tree', 'Bushes']) {
+      const node = env.root.getObjectByName(name)
+      if (node) swayNodes.push(node)
+    }
   } catch (err) {
     console.warn('[Environment] failed — falling back to grey box world', err)
   }
@@ -168,6 +177,13 @@ game.addUpdatable((dt) => followCamera.update(dt))
 game.addUpdatable((dt) => cinematicCamera.update(dt))
 game.addUpdatable((dt) => brunoView.update(dt))
 game.addUpdatable((dt) => mood.update(dt))
+game.addUpdatable((dt, elapsed) => fireflies.update(dt, elapsed))
+game.addUpdatable((_dt, elapsed) => {
+  // еле заметное покачивание зелени — медленный sin, не мигание
+  swayNodes.forEach((n, i) => {
+    n.rotation.z = Math.sin(elapsed * 0.4 + i * 1.7) * 0.012
+  })
+})
 game.addUpdatable(() => tapCue.update())
 game.addUpdatable(() => {
   brunoMarker.update()
