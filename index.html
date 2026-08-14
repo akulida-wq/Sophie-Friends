@@ -89,6 +89,86 @@
         font-weight: 600;
       }
 
+      /* --- Плавающие плашки: маркер над Бруно и имена (без миганий) --- */
+      .float-chip {
+        position: fixed;
+        transform: translate(-50%, -100%);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.5s ease;
+        z-index: 16;
+      }
+      .float-chip--on { opacity: 1; }
+      .float-chip--marker {
+        width: 7.5vh;
+        height: 7.5vh;
+        border-radius: 50%;
+        background: rgba(255, 250, 240, 0.94);
+        box-shadow: 0 5px 18px rgba(90, 80, 60, 0.2);
+        font-size: 3.8vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: chip-bob 2.6s ease-in-out infinite;
+      }
+      .float-chip--name {
+        padding: 0.8vh 2vh;
+        border-radius: 14px;
+        background: rgba(255, 250, 240, 0.92);
+        box-shadow: 0 4px 12px rgba(90, 80, 60, 0.16);
+        font-size: 2.2vh;
+        font-weight: 700;
+        color: #6b5d4f;
+      }
+      @keyframes chip-bob {
+        0%, 100% { transform: translate(-50%, -100%) translateY(0) scale(1); }
+        50% { transform: translate(-50%, -100%) translateY(-8px) scale(1.08); }
+      }
+
+      /* --- Аватарка Софи (общая для плашек и пузырей) --- */
+      .sophie-avatar {
+        flex: none;
+        width: 5.4vh;
+        height: 5.4vh;
+        border-radius: 50%;
+        background: #fdf3e3;
+        border: 2px solid #f0dfc8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3vh;
+      }
+
+      /* --- Стартовая плашка-наведение --- */
+      .intro-banner {
+        position: fixed;
+        left: 50%;
+        bottom: 5vh;
+        transform: translateX(-50%) translateY(16px);
+        display: flex;
+        align-items: center;
+        gap: 1.6vh;
+        padding: 1.8vh 2.6vh;
+        border-radius: 22px;
+        background: rgba(255, 250, 240, 0.96);
+        box-shadow: 0 8px 26px rgba(90, 80, 60, 0.2);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.5s ease, transform 0.5s ease;
+        z-index: 19;
+        max-width: 86vw;
+      }
+      .intro-banner--on {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+        pointer-events: auto;
+      }
+      .intro-banner__text {
+        font-size: 2.6vh;
+        font-weight: 600;
+        color: #6b5d4f;
+      }
+
       /* --- Tap cue: gentle breathing pulse, waits forever (no timer) --- */
       .tap-cue {
         position: fixed;

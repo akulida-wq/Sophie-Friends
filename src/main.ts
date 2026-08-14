@@ -19,6 +19,8 @@ import { BrunoView } from './interaction/BrunoView'
 import { ChoicePanel } from './dialogue/ChoicePanel'
 import { SophieBubble } from './dialogue/SophieBubble'
 import { TapCue } from './dialogue/TapCue'
+import { FloatChip } from './dialogue/FloatChip'
+import { IntroBanner } from './dialogue/IntroBanner'
 import { RewardGlow } from './dialogue/RewardGlow'
 import { PauseOverlay } from './safety/PauseOverlay'
 import { SoundToggle } from './safety/SoundToggle'
@@ -60,7 +62,18 @@ bruno.position.set(-3, 0, -8)
 bruno.rotation.y = Math.PI / 6
 game.scene.add(bruno)
 const brunoView = new BrunoView(bruno)
-brunoView.load(ASSET_BRUNO)
+void brunoView.load(ASSET_BRUNO).then((ok) => {
+  // glow должен светить GLB-модель, а не снятый плейсхолдер
+  if (ok) interaction.invalidate('bruno')
+})
+
+// --- Онбординг: маркер над Бруно + стартовая плашка от Софи ---
+const brunoMarker = new FloatChip(document.body, game.camera, 'marker')
+const namePlate = new FloatChip(document.body, game.camera, 'name')
+const introBanner = new IntroBanner(document.body)
+brunoMarker.show(bruno, '💛', { height: 3.1 })
+introBanner.show()
+let namePlateShown = false
 
 // --- Фоновые друзья (по спеку остаются заглушками), у песочницы ---
 const friends = createFriends()
@@ -101,7 +114,11 @@ interaction.add({
   id: 'bruno',
   object: bruno,
   triggerRadius: 3,
-  onActivate: () => story.start(),
+  onActivate: () => {
+    brunoMarker.hide() // наведение выполнило свою задачу
+    introBanner.hide()
+    story.start()
+  },
 })
 
 // --- Мир: площадка из GLB; при неудаче — серый бокс-мир как раньше ---
@@ -152,6 +169,14 @@ game.addUpdatable((dt) => cinematicCamera.update(dt))
 game.addUpdatable((dt) => brunoView.update(dt))
 game.addUpdatable((dt) => mood.update(dt))
 game.addUpdatable(() => tapCue.update())
+game.addUpdatable(() => {
+  brunoMarker.update()
+  namePlate.update()
+  if (!namePlateShown && game.sophie.position.distanceTo(bruno.position) < 4.2) {
+    namePlateShown = true
+    namePlate.show(bruno, 'Bruno', { height: 2.75, autohideMs: 3500 })
+  }
+})
 game.addUpdatable((dt) => safety.update(dt))
 
 game.start()

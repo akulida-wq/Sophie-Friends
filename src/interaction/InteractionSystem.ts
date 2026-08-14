@@ -26,6 +26,16 @@ export class InteractionSystem {
 
   add(interactable: Interactable): void {
     this.interactables.push(interactable)
+    this.collectFor(interactable)
+  }
+
+  /** Пересобрать материалы (например, после подмены плейсхолдера на GLB). */
+  invalidate(id: string): void {
+    const item = this.interactables.find((i) => i.id === id)
+    if (item) this.collectFor(item)
+  }
+
+  private collectFor(interactable: Interactable): void {
     const materials = collectMaterials(interactable.object)
     for (const m of materials) {
       m.emissive = new THREE.Color(0xfff2b8)
