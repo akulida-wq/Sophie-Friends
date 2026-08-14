@@ -41,6 +41,11 @@ HEADLESS = bpy.app.background
 CLIP_NAMES = ['IdleSad', 'IdleOpen', 'Walk', 'HandToChest', 'SmallWave',
               'SitAlone', 'TryJoinClumsy', 'TryAgainSucceed', 'PlayIncluded']
 
+# Гибрид: кепка и кеды вырезаются из Tripo-модели (текстурные, детальные),
+# остальное — процедурное. Если файла нет, всё строится процедурно.
+TRIPO_SRC = os.path.join(ROOT, 'public', 'assets', 'bruno_tripo.glb')
+HYBRID = os.path.isfile(TRIPO_SRC)
+
 
 def srgb(r, g, b):
     return tuple((c / 255.0) ** 2.2 for c in (r, g, b)) + (1.0,)
@@ -225,6 +230,104 @@ def top_z():
 
 Z_TOP = top_z()
 
+# ------------------------------------------ Tripo-детали (кепка + кеды)
+tripo_parts = {}
+if HYBRID:
+    from mathutils import Matrix as _M
+    _before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=TRIPO_SRC)
+    _imp = [o for o in bpy.data.objects if o not in _before]
+    _tripo = max((o for o in _imp if o.type == 'MESH'),
+                 key=lambda o: len(o.data.vertices))
+    for o in _imp:
+        if o is not _tripo:
+            bpy.data.objects.remove(o, do_unlink=True)
+    _mw = _tripo.matrix_world.copy()
+    _tripo.parent = None
+    _tripo.data.transform(_M.Rotation(math.pi, 4, 'Z') @ _mw)
+    _tripo.matrix_world = _M.Identity(4)
+    _th = max(v.co.z for v in _tripo.data.vertices)
+
+    # Классификация вершин по цвету текстуры (кепка розовая, тело голубое).
+    _img = None
+    for _m in _tripo.data.materials:
+        if _m and _m.use_nodes:
+            for _n in _m.node_tree.nodes:
+                if _n.type == 'TEX_IMAGE' and _n.image:
+                    _img = _n.image
+                    break
+    _vert_rgb = {}
+    if _img:
+        _uvl = _tripo.data.uv_layers.active
+        _w, _h = _img.size
+        _px = _img.pixels[:]
+        for _poly in _tripo.data.polygons:
+            for _li in _poly.loop_indices:
+                _vi = _tripo.data.loops[_li].vertex_index
+                if _vi in _vert_rgb:
+                    continue
+                _uv = _uvl.data[_li].uv
+                _x = int(_uv.x * _w) % _w
+                _y = int(_uv.y * _h) % _h
+                _i = 4 * (_y * _w + _x)
+                _vert_rgb[_vi] = (_px[_i], _px[_i + 1], _px[_i + 2])
+
+    def _is_pink(vi):
+        r, g, b = _vert_rgb.get(vi, (0, 0, 1))
+        return r > 0.25 and r > g * 1.25 and b > g * 0.7
+
+    def _extract(cond, name):
+        o = _tripo.copy()
+        o.data = _tripo.data.copy()
+        bruno_col.objects.link(o)
+        bm = bmesh.new()
+        bm.from_mesh(o.data)
+        bm.verts.ensure_lookup_table()
+        doomed = [v for v in bm.verts if not cond(v.index, v.co)]
+        bmesh.ops.delete(bm, geom=doomed, context='VERTS')
+        bm.to_mesh(o.data)
+        bm.free()
+        o.name = f'BR_{name}'
+        smooth(o)
+        return o
+
+    def _fit(o, scale, loc, rot=(0, 0, 0)):
+        o.scale = (scale, scale, scale)
+        o.rotation_euler = rot
+        o.location = loc
+
+    CAP_CUT = 0.868 * _th
+    SHOE_CUT = 0.14 * _th
+    # кепка: без ушей (|x|) и без макушки головы под куполом (радиус)
+    cap_t = _extract(lambda vi, c: c.z > CAP_CUT and _is_pink(vi), 'CapT')
+    shoeL_t = _extract(lambda vi, c: c.z < SHOE_CUT and c.x >= 0, 'ShoeT.L')
+    shoeR_t = _extract(lambda vi, c: c.z < SHOE_CUT and c.x < 0, 'ShoeT.R')
+
+    def _bbox(o):
+        xs = [v.co.x for v in o.data.vertices]
+        ys = [v.co.y for v in o.data.vertices]
+        zs = [v.co.z for v in o.data.vertices]
+        return (min(xs), max(xs)), (min(ys), max(ys)), (min(zs), max(zs))
+
+    (cx0, cx1), (cy0, cy1), (cz0, cz1) = _bbox(cap_t)
+    cap_scale = 0.95 / max(cx1 - cx0, 1e-4)
+    _fit(cap_t, cap_scale,
+         (0.05 - cap_scale * (cx0 + cx1) / 2,
+          -cap_scale * (cy0 + cy1) / 2,
+          Z_TOP - 0.22 - cap_scale * cz0),
+         rot=(-0.05, 0.16, 0))
+
+    for st, sx in ((shoeL_t, 1), (shoeR_t, -1)):
+        (bx0, bx1), (by0, by1), (bz0, bz1) = _bbox(st)
+        s = 0.50 / max(by1 - by0, 1e-4)
+        _fit(st, s,
+             (sx * 0.18 - s * (bx0 + bx1) / 2,
+              0.08 - s * (by0 + by1) / 2,
+              0.005 - s * bz0))
+    tripo_parts = {'cap': cap_t, 'shoeL': shoeL_t, 'shoeR': shoeR_t}
+    bpy.data.objects.remove(_tripo, do_unlink=True)
+    print('[hybrid] Tripo cap+shoes extracted')
+
 # ------------------------------------------------------------------ детали
 # Острые уши-рожки: торчат вбок-вверх из-под краёв кепки, заметные.
 for side, sx in (('L', 1), ('R', -1)):
@@ -311,33 +414,36 @@ smooth(fang)
 parts.append((fang, 'head'))
 
 # Маленькая розовая кепка набекрень: купол + тёмная окантовка + пуговка
-# + козырёк (как на арте).
+# + козырёк (как на арте). В гибриде — вырезанная из Tripo.
+if HYBRID:
+    parts.append((tripo_parts['cap'], 'head'))
 CAP_TILT = 0.22  # наклон вправо
-CAP_C = (0.07, 0.0, Z_TOP + 0.05)
-cap = sphere('Cap', 0.50, CAP_C, scale=(0.62, 0.62, 0.38),
-             rot=(-0.06, CAP_TILT, 0))
-cap.data.materials.clear()
-cap.data.materials.append(mat('cap'))
-parts.append((cap, 'head'))
-band = sphere('CapBand', 0.50, (CAP_C[0], CAP_C[1], CAP_C[2] - 0.075),
-              scale=(0.64, 0.64, 0.10), rot=(-0.06, CAP_TILT, 0))
-band.data.materials.clear()
-band.data.materials.append(mat('cap_dark'))
-parts.append((band, 'head'))
-button = sphere('CapButton', 0.045,
-                (CAP_C[0] + 0.04, CAP_C[1], CAP_C[2] + 0.185), seg=14)
-button.data.materials.clear()
-button.data.materials.append(mat('cap_dark'))
-parts.append((button, 'head'))
-bpy.ops.mesh.primitive_cylinder_add(radius=0.15, depth=0.038,
-                                    location=(0.11, 0.30, CAP_C[2] - 0.05),
-                                    rotation=(0.12, CAP_TILT * 0.5, 0), vertices=24)
-brim = bpy.context.active_object
-brim.name = 'BR_CapBrim'
-brim.scale = (1.35, 1.0, 1.0)
-brim.data.materials.append(mat('cap'))
-smooth(brim)
-parts.append((brim, 'head'))
+if not HYBRID:
+    CAP_C = (0.07, 0.0, Z_TOP + 0.05)
+    cap = sphere('Cap', 0.50, CAP_C, scale=(0.62, 0.62, 0.38),
+                 rot=(-0.06, CAP_TILT, 0))
+    cap.data.materials.clear()
+    cap.data.materials.append(mat('cap'))
+    parts.append((cap, 'head'))
+    band = sphere('CapBand', 0.50, (CAP_C[0], CAP_C[1], CAP_C[2] - 0.075),
+                  scale=(0.64, 0.64, 0.10), rot=(-0.06, CAP_TILT, 0))
+    band.data.materials.clear()
+    band.data.materials.append(mat('cap_dark'))
+    parts.append((band, 'head'))
+    button = sphere('CapButton', 0.045,
+                    (CAP_C[0] + 0.04, CAP_C[1], CAP_C[2] + 0.185), seg=14)
+    button.data.materials.clear()
+    button.data.materials.append(mat('cap_dark'))
+    parts.append((button, 'head'))
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.15, depth=0.038,
+                                        location=(0.11, 0.30, CAP_C[2] - 0.05),
+                                        rotation=(0.12, CAP_TILT * 0.5, 0), vertices=24)
+    brim = bpy.context.active_object
+    brim.name = 'BR_CapBrim'
+    brim.scale = (1.35, 1.0, 1.0)
+    brim.data.materials.append(mat('cap'))
+    smooth(brim)
+    parts.append((brim, 'head'))
 
 # Руки-«ласты» как на арте: длинные, расширяются книзу, слегка выгнуты
 # наружу. Каждая — своя metaball-цепочка (строим по одной: металлболы
