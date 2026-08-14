@@ -19,6 +19,7 @@ import { BrunoView } from './interaction/BrunoView'
 import { ChoicePanel } from './dialogue/ChoicePanel'
 import { SophieBubble } from './dialogue/SophieBubble'
 import { TapCue } from './dialogue/TapCue'
+import { RewardGlow } from './dialogue/RewardGlow'
 import { PauseOverlay } from './safety/PauseOverlay'
 import { SafetyLayer } from './safety/SafetyLayer'
 import { StoryEngine } from './story/StoryEngine'
@@ -46,6 +47,7 @@ const choicePanel = new ChoicePanel(document.body)
 const bubble = new SophieBubble(document.body)
 const tapCue = new TapCue(document.body, game.camera)
 const mood = new Mood(game.scene)
+const rewardGlow = new RewardGlow(document.body)
 new PauseOverlay(document.body, game)
 
 controller.tapInterceptor = (raycaster) => interaction.tryActivate(raycaster)
@@ -75,6 +77,7 @@ const story = new StoryEngine(
     interaction,
     brunoView,
     mood,
+    rewardGlow,
     actors: {
       resolve: (actorId) =>
         actorId === 'sophie' ? game.sophie : game.scene.getObjectByName(actorId) ?? null,

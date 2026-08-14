@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { audio } from '../audio/AudioSystem'
 import type { Game } from '../core/Game'
 import { collectMaterials, type Interactable } from './Interactable'
 
@@ -72,6 +73,7 @@ export class InteractionSystem {
       if (!this.inRange(item)) continue
       if (raycaster.intersectObject(item.object, true).length > 0) {
         this.setGlow(item, 0)
+        audio.ui('tap')
         if (this.overrideActivate?.(item.id)) return true
         item.onActivate()
         return true

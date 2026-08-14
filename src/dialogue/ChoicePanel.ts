@@ -1,3 +1,5 @@
+import { audio } from '../audio/AudioSystem'
+
 export interface ChoiceOption {
   id: string
   icon: string
@@ -84,6 +86,7 @@ export class ChoicePanel {
   }
 
   private pick(id: string): void {
+    audio.ui('card')
     const handler = this.onPick
     this.hide()
     handler?.(id)

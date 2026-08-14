@@ -3,6 +3,8 @@ import type { Game } from '../core/Game'
 import type { Mood } from '../core/Mood'
 import type { FollowCamera } from '../camera/FollowCamera'
 import type { CinematicCamera, CinematicPreset } from '../camera/CinematicCamera'
+import { audio } from '../audio/AudioSystem'
+import type { RewardGlow } from '../dialogue/RewardGlow'
 import type { ChoicePanel } from '../dialogue/ChoicePanel'
 import type { SophieBubble } from '../dialogue/SophieBubble'
 import type { TapCue } from '../dialogue/TapCue'
@@ -39,6 +41,7 @@ export interface StoryEngineDeps {
   actors: StoryActors
   /** Play a named animation clip on an actor; false = not handled (stub). */
   playActorAnim?: (actorId: string, anim: string) => boolean
+  rewardGlow?: RewardGlow
 }
 
 /** Minigame option id → world interactable id. */
@@ -221,6 +224,7 @@ export class StoryEngine {
       console.log(`[Story] simplified choices for "${scene.id}" -> ${choices.map((c) => c.id).join(', ')}`)
     }
 
+    audio.voice(scene.prompt?.voice)
     this.deps.choicePanel.show(
       {
         promptIcon: scene.prompt?.icon ? iconFor(scene.prompt.icon) : undefined,
@@ -268,8 +272,10 @@ export class StoryEngine {
         this.runScene(choice.next)
       }
     }
-    if (choice.sophie_line) this.deps.bubble.say(choice.sophie_line).then(proceed)
-    else proceed()
+    if (choice.sophie_line) {
+      audio.voice(choice.voice)
+      this.deps.bubble.say(choice.sophie_line).then(proceed)
+    } else proceed()
   }
 
   // --- Minigame ---------------------------------------------------------
@@ -391,6 +397,7 @@ export class StoryEngine {
 
       if (action.line) {
         console.log(`[Cinematic] ${action.actor ?? 'voice'}: "${action.line}"`)
+        audio.voice(action.voice)
         this.deps.bubble.say(action.line).then(step)
         return
       }
@@ -409,7 +416,9 @@ export class StoryEngine {
       if (action.reward) {
         console.log(`[Cinematic] reward: ${action.reward.type} (${action.reward.style})`)
         this.deps.mood.setColorTemp('warm')
-        window.setTimeout(step, 600)
+        audio.ui('reward')
+        this.deps.rewardGlow?.shine()
+        window.setTimeout(step, 1600) // дать сиянию раскрыться
         return
       }
       if (action.move) {

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { audio } from '../audio/AudioSystem'
 import type { ColorTemp, MoodSpec } from '../story/types'
 
 /**
@@ -32,7 +33,10 @@ export class Mood {
   apply(mood: MoodSpec | undefined): void {
     if (!mood) return
     if (mood.color_temp) this.setColorTemp(mood.color_temp)
-    if (mood.music) console.log(`[Mood] music -> ${mood.music} (stub until Task 9)`)
+    if (mood.music) {
+      console.log(`[Mood] music -> ${mood.music}`)
+      audio.setMood(mood.music)
+    }
   }
 
   setColorTemp(temp: ColorTemp): void {

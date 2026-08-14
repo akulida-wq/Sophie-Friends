@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { audio } from '../audio/AudioSystem'
 
 /**
  * Soft pulsing tap cue (💛) floated over a 3D target — used by
@@ -25,6 +26,7 @@ export class TapCue {
   show(target: THREE.Object3D, onTap: () => void): void {
     this.target = target
     this.button.onclick = () => {
+      audio.ui('cue')
       this.hide()
       onTap()
     }

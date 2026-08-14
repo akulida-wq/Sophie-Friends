@@ -115,6 +115,27 @@
         50% { transform: scale(1.1); }
       }
 
+      /* --- Тёплое сияние награды: медленно, мягко, без вспышек --- */
+      .reward-glow {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center,
+          rgba(255, 216, 150, 0.55) 0%,
+          rgba(255, 216, 150, 0.18) 45%,
+          rgba(255, 216, 150, 0) 75%);
+        opacity: 0;
+        z-index: 12;
+      }
+      .reward-glow--on {
+        animation: reward-shine 4.5s ease-in-out 1;
+      }
+      @keyframes reward-shine {
+        0% { opacity: 0; }
+        40% { opacity: 0.8; }
+        100% { opacity: 0; }
+      }
+
       /* --- Sophie's speech bubble (placeholder for voice-over) --- */
       .sophie-bubble {
         position: fixed;
