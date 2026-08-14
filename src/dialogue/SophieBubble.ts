@@ -6,16 +6,23 @@ export class SophieBubble {
   private readonly root: HTMLDivElement
   private hideTimer: number | null = null
 
+  private readonly textEl: HTMLSpanElement
+
   constructor(container: HTMLElement) {
     this.root = document.createElement('div')
     this.root.className = 'sophie-bubble'
+    const avatar = document.createElement('span')
+    avatar.className = 'sophie-avatar'
+    avatar.textContent = '🐶'
+    this.textEl = document.createElement('span')
+    this.root.append(avatar, this.textEl)
     container.appendChild(this.root)
   }
 
   say(line: string, holdMs = 2600): Promise<void> {
     return new Promise((resolve) => {
       if (this.hideTimer !== null) window.clearTimeout(this.hideTimer)
-      this.root.textContent = `🐶 ${line}`
+      this.textEl.textContent = line
       this.root.classList.add('sophie-bubble--open')
       this.hideTimer = window.setTimeout(() => {
         this.root.classList.remove('sophie-bubble--open')

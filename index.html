@@ -5,6 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Sophie &amp; Friends</title>
     <style>
+      @font-face {
+        font-family: 'Nunito';
+        src: url('/fonts/nunito-600.woff2') format('woff2');
+        font-weight: 600;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Nunito';
+        src: url('/fonts/nunito-700.woff2') format('woff2');
+        font-weight: 700;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Nunito';
+        src: url('/fonts/nunito-800.woff2') format('woff2');
+        font-weight: 800;
+        font-display: swap;
+      }
       html, body {
         margin: 0;
         padding: 0;
@@ -15,7 +33,7 @@
         touch-action: none;
         -webkit-user-select: none;
         user-select: none;
-        font-family: system-ui, -apple-system, sans-serif;
+        font-family: 'Nunito', system-ui, -apple-system, sans-serif;
       }
       #app { width: 100%; height: 100%; }
       canvas { display: block; }
@@ -68,13 +86,18 @@
         align-items: center;
         justify-content: center;
         gap: 1.5vh;
-        border: none;
-        border-radius: 24px;
-        background: rgba(255, 250, 240, 0.94);
-        box-shadow: 0 6px 24px rgba(90, 80, 60, 0.18);
+        border: 3px solid #f2e3d1;
+        border-radius: 28px;
+        background: rgba(255, 252, 246, 0.97);
+        box-shadow: 0 8px 24px rgba(90, 80, 60, 0.16);
         cursor: pointer;
-        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
         -webkit-tap-highlight-color: transparent;
+      }
+      .choice-card:hover {
+        transform: scale(1.05);
+        border-color: #eeceac;
+        box-shadow: 0 10px 28px rgba(90, 80, 60, 0.22);
       }
       .choice-card:active {
         transform: scale(0.97);
@@ -86,7 +109,7 @@
       .choice-card__label {
         font-size: 2.6vh;
         color: #6b5d4f;
-        font-weight: 600;
+        font-weight: 700;
       }
 
       /* --- Плавающие плашки: маркер над Бруно и имена (без миганий) --- */
@@ -222,18 +245,32 @@
         left: 50%;
         bottom: 30vh;
         transform: translateX(-50%) translateY(10px);
-        max-width: 80vw;
-        padding: 2vh 3vh;
-        border-radius: 22px;
-        background: rgba(255, 250, 240, 0.95);
-        box-shadow: 0 6px 20px rgba(90, 80, 60, 0.18);
-        font-size: 2.6vh;
+        max-width: 82vw;
+        display: flex;
+        align-items: center;
+        gap: 1.6vh;
+        padding: 1.8vh 2.6vh;
+        border-radius: 24px;
+        border: 3px solid #f2e3d1;
+        background: rgba(255, 252, 246, 0.97);
+        box-shadow: 0 8px 22px rgba(90, 80, 60, 0.18);
+        font-size: 2.9vh;
+        font-weight: 600;
         color: #6b5d4f;
-        text-align: center;
+        text-align: left;
         opacity: 0;
         pointer-events: none;
         transition: opacity 0.4s ease, transform 0.4s ease;
         z-index: 15;
+      }
+      .sophie-bubble::after {
+        content: '';
+        position: absolute;
+        left: 4.2vh;
+        bottom: -1.9vh;
+        border-width: 2vh 1.4vh 0 1.4vh;
+        border-style: solid;
+        border-color: #f2e3d1 transparent transparent transparent;
       }
       .sophie-bubble--open {
         opacity: 1;
@@ -247,7 +284,7 @@
         right: 2.5vh;
         width: 7vh;
         height: 7vh;
-        border: none;
+        border: 3px solid #f2e3d1;
         border-radius: 50%;
         background: rgba(255, 250, 240, 0.9);
         box-shadow: 0 4px 14px rgba(90, 80, 60, 0.16);
@@ -262,7 +299,7 @@
         right: 2.5vh;
         width: 7vh;
         height: 7vh;
-        border: none;
+        border: 3px solid #f2e3d1;
         border-radius: 50%;
         background: rgba(255, 250, 240, 0.9);
         box-shadow: 0 4px 14px rgba(90, 80, 60, 0.16);
