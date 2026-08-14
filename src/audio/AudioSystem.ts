@@ -27,12 +27,31 @@ class AudioSystem {
   private pendingMood: MoodMusic = 'ambient_calm'
   private readonly missingVoices = new Set<string>()
 
+  private userPaused = false
+
   constructor() {
     const unlock = () => {
       this.ensure()
       window.removeEventListener('pointerdown', unlock)
     }
     window.addEventListener('pointerdown', unlock)
+    // Фоновая вкладка не должна гудеть.
+    document.addEventListener('visibilitychange', () => {
+      if (!this.ctx) return
+      if (document.hidden) void this.ctx.suspend()
+      else if (!this.userPaused) void this.ctx.resume()
+    })
+  }
+
+  /** Пауза игры глушит весь звук; резюм возвращает. */
+  suspend(): void {
+    this.userPaused = true
+    if (this.ctx) void this.ctx.suspend()
+  }
+
+  resume(): void {
+    this.userPaused = false
+    if (this.ctx && !document.hidden) void this.ctx.resume()
   }
 
   private ensure(): AudioContext | null {

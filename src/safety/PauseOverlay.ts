@@ -1,3 +1,4 @@
+import { audio } from '../audio/AudioSystem'
 import type { Game } from '../core/Game'
 import type { GameState } from '../core/GameState'
 
@@ -36,11 +37,13 @@ export class PauseOverlay {
     this.resumeState = this.game.states.state
     this.game.states.transition('PAUSED')
     this.veil.classList.add('pause-veil--open')
+    audio.suspend()
   }
 
   private resume(): void {
     if (!this.game.states.is('PAUSED')) return
     this.veil.classList.remove('pause-veil--open')
     this.game.states.transition(this.resumeState)
+    audio.resume()
   }
 }
