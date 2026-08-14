@@ -53,10 +53,9 @@ export class SophieView {
     const scale = size.y > 0 ? TARGET_HEIGHT / size.y : 1
     model.scale.setScalar(scale)
     model.position.y = -bounds.min.y * scale
-    // Container yaw aligns the model's visual nose with the controller's
-    // +Z forward. Tuned empirically per asset (Tripo rig axes are messy —
-    // bone names/landmarks there are unreliable, eyes are the judge).
-    model.rotation.y = Math.PI * 1.5
+    // The Blender rig faces -Z after glTF export; the controller treats +Z
+    // as forward. Flip the model container so she leads with her nose.
+    model.rotation.y = Math.PI
     model.name = 'sophie-model'
 
     // Swap out the grey capsule placeholder.
