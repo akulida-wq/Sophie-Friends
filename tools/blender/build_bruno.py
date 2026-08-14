@@ -31,6 +31,7 @@ import json as jsonlib
 
 import bmesh
 import bpy
+from mathutils import Vector, noise
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT_GLB = os.path.join(ROOT, 'public', 'assets', 'bruno.glb')
@@ -58,12 +59,36 @@ COL = {
     'fang': srgb(248, 246, 238),
 }
 
-# Силуэт: широченная голова (половина роста), плавное сужение вниз.
+# Силуэт: широченная голова (половина роста), сужение вниз; низ тела
+# приподнят, чтобы были видны ноги.
 ELS = [((0, 0, 1.85), 0.85),
        ((0, 0, 1.45), 0.75),
-       ((0, 0, 1.00), 0.62),
-       ((0, 0, 0.65), 0.55),
-       ((0, 0, 0.48), 0.44)]
+       ((0, 0, 1.05), 0.62),
+       ((0, 0, 0.80), 0.53)]
+
+# Акварельная пятнистость (как на арте): базовый + тёмный/светлый тона.
+MOTTLE_BASE = (118, 182, 228)
+MOTTLE_DARK = (96, 158, 210)
+MOTTLE_LIGHT = (152, 206, 240)
+
+
+def mottle(obj, scale1=2.4, scale2=6.0):
+    """Вершинные цвета с шумом — переживают экспорт в GLB (COLOR_0)."""
+    me = obj.data
+    attr = me.color_attributes.new(name='Col', type='BYTE_COLOR', domain='POINT')
+    base = Vector([c / 255.0 for c in MOTTLE_BASE])
+    dark = Vector([c / 255.0 for c in MOTTLE_DARK])
+    light = Vector([c / 255.0 for c in MOTTLE_LIGHT])
+    mw = obj.matrix_world
+    for i, v in enumerate(me.vertices):
+        co = mw @ v.co
+        n = (noise.noise(co * scale1) * 0.65 + noise.noise(co * scale2) * 0.35)
+        if n >= 0:
+            col = base.lerp(light, min(1.0, n * 1.1))
+        else:
+            col = base.lerp(dark, min(1.0, -n * 1.3))
+        # sRGB -> linear для BYTE_COLOR
+        attr.data[i].color = tuple(c ** 2.2 for c in col) + (1.0,)
 
 # ------------------------------------------------------------ подготовка
 if HEADLESS:
@@ -116,6 +141,11 @@ def mat(key, roughness=0.9):
         bsdf = m.node_tree.nodes['Principled BSDF']
         bsdf.inputs['Base Color'].default_value = COL[key]
         bsdf.inputs['Roughness'].default_value = roughness
+        if key == 'body':
+            # Акварельная пятнистость через вершинные цвета (COLOR_0 в GLB).
+            vc = m.node_tree.nodes.new('ShaderNodeVertexColor')
+            vc.layer_name = 'Col'
+            m.node_tree.links.new(vc.outputs['Color'], bsdf.inputs['Base Color'])
         _mats[key] = m
     return _mats[key]
 
@@ -169,6 +199,7 @@ sm = blob.modifiers.new('Smooth', 'SMOOTH')
 sm.factor = 1.0
 sm.iterations = 6
 smooth(blob)
+mottle(blob)
 
 
 def surf_y(x, z):
@@ -201,6 +232,7 @@ for side, sx in (('L', 1), ('R', -1)):
     ss.levels = 2
     ss.render_levels = 2
     smooth(ear)
+    mottle(ear)
     parts.append((ear, 'head'))
 
 # Огромное око: белок (вертикальный овал), зрачок, два блика.
@@ -268,14 +300,14 @@ parts.append((fang, 'head'))
 
 # Розовая кепка набекрень между ушами + козырёк.
 CAP_TILT = 0.20  # наклон вправо
-cap = sphere('Cap', 0.50, (0.06, 0.0, Z_TOP + 0.01),
-             scale=(0.92, 0.92, 0.50), rot=(-0.06, CAP_TILT, 0))
+cap = sphere('Cap', 0.50, (0.06, 0.0, Z_TOP + 0.04),
+             scale=(0.76, 0.76, 0.44), rot=(-0.06, CAP_TILT, 0))
 cap.data.materials.clear()
 cap.data.materials.append(mat('cap'))
 parts.append((cap, 'head'))
-brim_y = surf_y(0.1, Z_TOP - 0.10) + 0.14
-bpy.ops.mesh.primitive_cylinder_add(radius=0.21, depth=0.045,
-                                    location=(0.13, brim_y, Z_TOP - 0.06),
+brim_y = surf_y(0.1, Z_TOP - 0.10) + 0.10
+bpy.ops.mesh.primitive_cylinder_add(radius=0.175, depth=0.04,
+                                    location=(0.12, brim_y, Z_TOP - 0.02),
                                     rotation=(0.12, CAP_TILT * 0.5, 0), vertices=24)
 brim = bpy.context.active_object
 brim.name = 'BR_CapBrim'
@@ -284,36 +316,62 @@ brim.data.materials.append(mat('cap'))
 smooth(brim)
 parts.append((brim, 'head'))
 
-# Длиннющие висячие руки с ладошками, чуть в сторону от тела.
-for side, sx in (('L', 1), ('R', -1)):
-    ax = surf_x(1.30) - 0.01
-    armo = sphere(f'Arm.{side}', 1.0, (sx * (ax + 0.03), 0, 1.00),
-                  scale=(0.09, 0.09, 0.62), rot=(0, sx * 0.09, 0))
-    parts.append((armo, f'arm.{side}'))
-    hand = sphere(f'Hand.{side}', 1.0, (sx * (ax + 0.10), 0.02, 0.42),
-                  scale=(0.115, 0.09, 0.16))
-    parts.append((hand, f'arm.{side}'))
+# Руки-«ласты» как на арте: длинные, расширяются книзу, слегка выгнуты
+# наружу. Каждая — своя metaball-цепочка (строим по одной: металлболы
+# одной "семьи" сливаются, пока сосуществуют).
+def build_arm(side, sx):
+    bpy.ops.object.metaball_add(type='BALL', location=(0, 0, 0))
+    mb = bpy.context.active_object
+    mb.data.resolution = 0.045
+    # Плотная цепочка (шаг ~0.13), иначе поля элементов не сольются.
+    chain = []
+    steps = 9
+    for i in range(steps):
+        t = i / (steps - 1)
+        cx = sx * (0.50 + 0.13 * t)
+        cy = 0.02 * t
+        cz = 1.42 - 1.04 * t
+        cr = 0.13 + 0.06 * t
+        chain.append(((cx, cy, cz), cr))
+    el = mb.data.elements[0]
+    el.co, el.radius = chain[0]
+    for co, r in chain[1:]:
+        e = mb.data.elements.new()
+        e.co = co
+        e.radius = r
+    bpy.ops.object.convert(target='MESH')
+    o = bpy.context.active_object
+    o.name = f'BR_Arm.{side}'
+    o.data.materials.append(mat('body'))
+    smooth(o)
+    mottle(o)
+    return o
 
-# Кеды прямо под телом; короткие стопы-переходники прячутся под корпусом.
+
 for side, sx in (('L', 1), ('R', -1)):
-    ankle = sphere(f'Ankle.{side}', 1.0, (sx * 0.17, 0, 0.24),
-                   scale=(0.10, 0.10, 0.14))
-    parts.append((ankle, f'leg.{side}'))
-    shoe = rbox(f'Shoe.{side}', (0.16, 0.30, 0.11), (sx * 0.17, 0.05, 0.105),
+    parts.append((build_arm(side, sx), f'arm.{side}'))
+
+# Видимые ноги (длиннее) + кеды побольше с белыми деталями.
+for side, sx in (('L', 1), ('R', -1)):
+    leg = sphere(f'Leg.{side}', 1.0, (sx * 0.17, 0, 0.32),
+                 scale=(0.085, 0.085, 0.24))
+    mottle(leg)
+    parts.append((leg, f'leg.{side}'))
+    shoe = rbox(f'Shoe.{side}', (0.18, 0.34, 0.12), (sx * 0.17, 0.06, 0.115),
                 'shoe')
     parts.append((shoe, f'leg.{side}'))
-    sole = rbox(f'Sole.{side}', (0.17, 0.32, 0.038), (sx * 0.17, 0.05, 0.030),
+    sole = rbox(f'Sole.{side}', (0.19, 0.36, 0.042), (sx * 0.17, 0.06, 0.032),
                 'shoe_trim')
     parts.append((sole, f'leg.{side}'))
-    toe = sphere(f'Toe.{side}', 1.0, (sx * 0.17, 0.21, 0.10),
-                 scale=(0.125, 0.10, 0.082))
+    toe = sphere(f'Toe.{side}', 1.0, (sx * 0.17, 0.245, 0.11),
+                 scale=(0.14, 0.11, 0.09))
     toe.data.materials.clear()
     toe.data.materials.append(mat('shoe_trim'))
     parts.append((toe, f'leg.{side}'))
     for si in range(3):
         stripe = rbox(f'Stripe{si}.{side}',
-                      (0.014, 0.045, 0.08),
-                      (sx * (0.17 + 0.076), 0.08 - si * 0.065, 0.105),
+                      (0.015, 0.05, 0.09),
+                      (sx * (0.17 + 0.086), 0.10 - si * 0.075, 0.115),
                       'shoe_trim', rot=(0, 0, sx * 0.3))
         parts.append((stripe, f'leg.{side}'))
 
