@@ -21,6 +21,7 @@ import { SophieBubble } from './dialogue/SophieBubble'
 import { TapCue } from './dialogue/TapCue'
 import { RewardGlow } from './dialogue/RewardGlow'
 import { PauseOverlay } from './safety/PauseOverlay'
+import { SoundToggle } from './safety/SoundToggle'
 import { SafetyLayer } from './safety/SafetyLayer'
 import { StoryEngine } from './story/StoryEngine'
 import type { StoryMission } from './story/types'
@@ -49,6 +50,7 @@ const tapCue = new TapCue(document.body, game.camera)
 const mood = new Mood(game.scene)
 const rewardGlow = new RewardGlow(document.body)
 new PauseOverlay(document.body, game)
+new SoundToggle(document.body)
 
 controller.tapInterceptor = (raycaster) => interaction.tryActivate(raycaster)
 
