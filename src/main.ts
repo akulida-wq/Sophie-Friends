@@ -1,5 +1,7 @@
+import * as THREE from 'three'
 import { Game } from './core/Game'
 import { Mood } from './core/Mood'
+import { loadEnvironment, type PropId } from './core/Environment'
 import { SophieController } from './player/SophieController'
 import { SophieView } from './player/SophieView'
 import { FollowCamera } from './camera/FollowCamera'
@@ -23,6 +25,11 @@ import { StoryEngine } from './story/StoryEngine'
 import type { StoryMission } from './story/types'
 import brunoMission from './story/bruno.json'
 
+// v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
+const ASSET_SOPHIE = '/assets/sophie.glb?v=8'
+const ASSET_BRUNO = '/assets/bruno.glb?v=3'
+const ASSET_ENV = '/assets/environment.glb?v=1'
+
 const container = document.getElementById('app')
 if (!container) throw new Error('Missing #app container')
 
@@ -30,8 +37,7 @@ const game = new Game(container)
 
 const controller = new SophieController(game)
 const sophieView = new SophieView(game.sophie)
-// v-параметр обновлять при замене ассета — сбрасывает кеш браузера.
-sophieView.load('/assets/sophie.glb?v=8') // async; capsule stays if it fails
+sophieView.load(ASSET_SOPHIE) // async; капсула остаётся при неудаче
 controller.onAnimChange = (state) => sophieView.play(state)
 const followCamera = new FollowCamera(game.camera, game.sophie)
 const cinematicCamera = new CinematicCamera(game.camera)
@@ -44,37 +50,18 @@ new PauseOverlay(document.body, game)
 
 controller.tapInterceptor = (raycaster) => interaction.tryActivate(raycaster)
 
-// --- Placeholder props, NPC and friends (grey-box, GLB in Tasks 7-8) ---
-const ball = createBall()
-ball.position.set(3.5, 0, 1.5)
-const blocks = createBlocks()
-blocks.position.set(-4, 0, -2.5)
-const tree = createTree()
-tree.position.set(5.5, 0, -6)
-const chalk = createChalk()
-chalk.position.set(1.5, 0, -4)
+// --- Бруно: якорь-группа сразу (плейсхолдер), GLB подменяет содержимое ---
 const bruno = createBruno()
 bruno.position.set(-3, 0, -8)
 bruno.rotation.y = Math.PI / 6
-const friends = createFriends()
-friends.position.set(4, 0, -12)
-game.scene.add(ball, blocks, tree, chalk, bruno, friends)
-
+game.scene.add(bruno)
 const brunoView = new BrunoView(bruno)
+brunoView.load(ASSET_BRUNO)
 
-for (const [id, object] of [
-  ['ball', ball],
-  ['blocks', blocks],
-  ['tree', tree],
-  ['chalk', chalk],
-] as const) {
-  interaction.add({
-    id,
-    object,
-    triggerRadius: 2.5,
-    onActivate: () => console.log(`[Interact] ${id} activated`),
-  })
-}
+// --- Фоновые друзья (по спеку остаются заглушками), у песочницы ---
+const friends = createFriends()
+friends.position.set(1.8, 0, -10.4)
+game.scene.add(friends)
 
 // --- Story: mission JSON drives everything after this point ---
 const story = new StoryEngine(
@@ -92,7 +79,12 @@ const story = new StoryEngine(
       resolve: (actorId) =>
         actorId === 'sophie' ? game.sophie : game.scene.getObjectByName(actorId) ?? null,
     },
-    playActorAnim: (actorId, anim) => (actorId === 'sophie' ? sophieView.play(anim) : false),
+    playActorAnim: (actorId, anim) =>
+      actorId === 'sophie'
+        ? sophieView.play(anim)
+        : actorId === 'bruno'
+          ? brunoView.play(anim)
+          : false,
   },
   brunoMission as StoryMission,
 )
@@ -106,6 +98,46 @@ interaction.add({
   triggerRadius: 3,
   onActivate: () => story.start(),
 })
+
+// --- Мир: площадка из GLB; при неудаче — серый бокс-мир как раньше ---
+const PLACEHOLDER_PROPS: Record<PropId, [() => THREE.Group, [number, number, number]]> = {
+  ball: [createBall, [3.5, 0, 1.5]],
+  blocks: [createBlocks, [-4, 0, -2.5]],
+  tree: [createTree, [5.5, 0, -6]],
+  chalk: [createChalk, [1.5, 0, -4]],
+}
+
+async function bootWorld(): Promise<void> {
+  let props: Partial<Record<PropId, THREE.Object3D>> = {}
+  try {
+    const env = await loadEnvironment(ASSET_ENV)
+    game.scene.getObjectByName('ground')?.removeFromParent() // серый пол долой
+    game.scene.add(env.root)
+    props = env.props
+  } catch (err) {
+    console.warn('[Environment] failed — falling back to grey box world', err)
+  }
+  for (const [id, [factory, pos]] of Object.entries(PLACEHOLDER_PROPS) as [
+    PropId,
+    [() => THREE.Group, [number, number, number]],
+  ][]) {
+    let object = props[id]
+    if (!object) {
+      const placeholder = factory()
+      placeholder.position.set(...pos)
+      game.scene.add(placeholder)
+      object = placeholder
+    }
+    interaction.add({
+      id,
+      object,
+      triggerRadius: 2.5,
+      onActivate: () => console.log(`[Interact] ${id} activated`),
+    })
+  }
+}
+
+void bootWorld()
 
 game.addUpdatable((dt) => controller.update(dt))
 game.addUpdatable((dt) => sophieView.update(dt))

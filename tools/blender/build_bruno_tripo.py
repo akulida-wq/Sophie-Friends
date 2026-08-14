@@ -248,11 +248,13 @@ def axes_for(key):
     down = Vector((0, 0, -1))
     side = Vector((1, 0, 0))
     fwd = Vector((0, 1, 0))
+    # ВНИМАНИЕ: знак pitch инвертирован относительно пробы — проверено
+    # по движку (плюс = наклон вперёд-вниз в игре).
     if abs(dx.dot(down)) >= abs(dz.dot(down)):
-        pitch = (0, 1.0 if dx.dot(down) > 0 else -1.0)
+        pitch = (0, -1.0 if dx.dot(down) > 0 else 1.0)
         side_ax = (2, 1.0 if dz.dot(side) > 0 else -1.0)
     else:
-        pitch = (2, 1.0 if dz.dot(down) > 0 else -1.0)
+        pitch = (2, -1.0 if dz.dot(down) > 0 else 1.0)
         side_ax = (0, 1.0 if dx.dot(side) > 0 else -1.0)
     if abs(dx.dot(fwd)) >= abs(dz.dot(fwd)):
         fwd_ax = (0, 1.0 if dx.dot(fwd) > 0 else -1.0)
