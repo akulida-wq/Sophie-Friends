@@ -50,6 +50,7 @@ COL = {
     'body': srgb(118, 182, 228),
     'freckle': srgb(246, 233, 183),
     'cap': srgb(228, 138, 190),
+    'cap_dark': srgb(202, 108, 162),
     'shoe': srgb(58, 148, 82),
     'shoe_trim': srgb(242, 246, 242),
     'eye': srgb(245, 245, 241),
@@ -59,12 +60,17 @@ COL = {
     'fang': srgb(248, 246, 238),
 }
 
-# Силуэт: широченная голова (половина роста), сужение вниз; низ тела
-# приподнят, чтобы были видны ноги.
-ELS = [((0, 0, 1.85), 0.85),
+# Силуэт: широченная голова (половина роста), сужение вниз, и НОГИ КАК
+# ПРОДОЛЖЕНИЕ ТЕЛА — две колонны metaball-элементов, корпус плавно
+# раздваивается (как на арте), без отдельных "палок".
+ELS = [((0, 0, 1.85), 0.88),
        ((0, 0, 1.45), 0.75),
-       ((0, 0, 1.05), 0.62),
-       ((0, 0, 0.80), 0.53)]
+       ((0, 0, 1.05), 0.58),
+       ((0, 0, 0.85), 0.52)]
+for _sx in (1, -1):
+    ELS += [((_sx * 0.16, 0.00, 0.58), 0.24),
+            ((_sx * 0.175, 0.00, 0.40), 0.20),
+            ((_sx * 0.18, 0.01, 0.26), 0.17)]
 
 # Акварельная пятнистость (как на арте): базовый + тёмный/светлый тона.
 MOTTLE_BASE = (118, 182, 228)
@@ -253,10 +259,16 @@ for gname, gx, gz, gr in (('Gleam1', 0.055, EYE_Z + 0.07, 0.034),
     g.data.materials.clear()
     g.data.materials.append(mat('highlight', roughness=0.2))
     parts.append((g, 'head'))
+# Тонкое верхнее веко (цвет тела) — едва заметная полоска, как на арте.
+lid = sphere('Eyelid', 1.0, (0, eye_y + 0.065, EYE_Z + 0.185),
+             scale=(0.235, 0.095, 0.05), rot=(-0.25, 0, 0))
+mottle(lid)
+parts.append((lid, 'head'))
 
-# Кремовые веснушки — 4 на каждую щёку, сидят на поверхности.
+# Кремовые веснушки — по 5 разного размера на щёку, как на арте.
 freckles = [(0.30, 1.62, 0.052), (0.40, 1.68, 0.042),
-            (0.34, 1.52, 0.036), (0.44, 1.56, 0.047)]
+            (0.34, 1.52, 0.036), (0.44, 1.56, 0.047),
+            (0.38, 1.61, 0.026)]
 for i, (fx, fz, fr) in enumerate(freckles):
     for sx in (1, -1):
         fy = surf_y(sx * fx, fz) - fr * 0.35
@@ -298,16 +310,27 @@ fang.data.materials.append(mat('fang'))
 smooth(fang)
 parts.append((fang, 'head'))
 
-# Розовая кепка набекрень между ушами + козырёк.
-CAP_TILT = 0.20  # наклон вправо
-cap = sphere('Cap', 0.50, (0.06, 0.0, Z_TOP + 0.04),
-             scale=(0.76, 0.76, 0.44), rot=(-0.06, CAP_TILT, 0))
+# Маленькая розовая кепка набекрень: купол + тёмная окантовка + пуговка
+# + козырёк (как на арте).
+CAP_TILT = 0.22  # наклон вправо
+CAP_C = (0.07, 0.0, Z_TOP + 0.05)
+cap = sphere('Cap', 0.50, CAP_C, scale=(0.62, 0.62, 0.38),
+             rot=(-0.06, CAP_TILT, 0))
 cap.data.materials.clear()
 cap.data.materials.append(mat('cap'))
 parts.append((cap, 'head'))
-brim_y = surf_y(0.1, Z_TOP - 0.10) + 0.10
-bpy.ops.mesh.primitive_cylinder_add(radius=0.175, depth=0.04,
-                                    location=(0.12, brim_y, Z_TOP - 0.02),
+band = sphere('CapBand', 0.50, (CAP_C[0], CAP_C[1], CAP_C[2] - 0.075),
+              scale=(0.64, 0.64, 0.10), rot=(-0.06, CAP_TILT, 0))
+band.data.materials.clear()
+band.data.materials.append(mat('cap_dark'))
+parts.append((band, 'head'))
+button = sphere('CapButton', 0.045,
+                (CAP_C[0] + 0.04, CAP_C[1], CAP_C[2] + 0.185), seg=14)
+button.data.materials.clear()
+button.data.materials.append(mat('cap_dark'))
+parts.append((button, 'head'))
+bpy.ops.mesh.primitive_cylinder_add(radius=0.15, depth=0.038,
+                                    location=(0.11, 0.30, CAP_C[2] - 0.05),
                                     rotation=(0.12, CAP_TILT * 0.5, 0), vertices=24)
 brim = bpy.context.active_object
 brim.name = 'BR_CapBrim'
@@ -324,14 +347,16 @@ def build_arm(side, sx):
     mb = bpy.context.active_object
     mb.data.resolution = 0.045
     # Плотная цепочка (шаг ~0.13), иначе поля элементов не сольются.
+    # Выгнута наружу сильнее, крепится выше — как на арте.
     chain = []
     steps = 9
     for i in range(steps):
         t = i / (steps - 1)
-        cx = sx * (0.50 + 0.13 * t)
+        bow = math.sin(t * math.pi) * 0.05  # лёгкий изгиб наружу в середине
+        cx = sx * (0.50 + 0.17 * t + bow)
         cy = 0.02 * t
-        cz = 1.42 - 1.04 * t
-        cr = 0.13 + 0.06 * t
+        cz = 1.48 - 1.12 * t
+        cr = 0.125 + 0.065 * t
         chain.append(((cx, cy, cz), cr))
     el = mb.data.elements[0]
     el.co, el.radius = chain[0]
@@ -343,6 +368,9 @@ def build_arm(side, sx):
     o = bpy.context.active_object
     o.name = f'BR_Arm.{side}'
     o.data.materials.append(mat('body'))
+    asm = o.modifiers.new('Smooth', 'SMOOTH')
+    asm.factor = 1.0
+    asm.iterations = 5
     smooth(o)
     mottle(o)
     return o
@@ -351,12 +379,8 @@ def build_arm(side, sx):
 for side, sx in (('L', 1), ('R', -1)):
     parts.append((build_arm(side, sx), f'arm.{side}'))
 
-# Видимые ноги (длиннее) + кеды побольше с белыми деталями.
+# Кеды побольше с белыми деталями (ноги — уже часть тела-блоба).
 for side, sx in (('L', 1), ('R', -1)):
-    leg = sphere(f'Leg.{side}', 1.0, (sx * 0.17, 0, 0.32),
-                 scale=(0.085, 0.085, 0.24))
-    mottle(leg)
-    parts.append((leg, f'leg.{side}'))
     shoe = rbox(f'Shoe.{side}', (0.18, 0.34, 0.12), (sx * 0.17, 0.06, 0.115),
                 'shoe')
     parts.append((shoe, f'leg.{side}'))
@@ -387,10 +411,10 @@ BONES = {
     'root': ((0, 0, 0.05), (0, 0, 0.55), None),
     'spine': ((0, 0, 0.55), (0, 0, 1.50), 'root'),
     'head': ((0, 0, 1.50), (0, 0, Z_TOP), 'spine'),
-    'arm.L': ((0.52, 0, 1.45), (0.60, 0, 0.30), 'spine'),
-    'arm.R': ((-0.52, 0, 1.45), (-0.60, 0, 0.30), 'spine'),
-    'leg.L': ((0.18, 0, 0.45), (0.18, 0, 0.05), 'root'),
-    'leg.R': ((-0.18, 0, 0.45), (-0.18, 0, 0.05), 'root'),
+    'arm.L': ((0.52, 0, 1.48), (0.67, 0, 0.34), 'spine'),
+    'arm.R': ((-0.52, 0, 1.48), (-0.67, 0, 0.34), 'spine'),
+    'leg.L': ((0.17, 0, 0.60), (0.17, 0, 0.08), 'root'),
+    'leg.R': ((-0.17, 0, 0.60), (-0.17, 0, 0.08), 'root'),
 }
 created = {}
 for name, (bhead, tail, parent) in BONES.items():
@@ -403,15 +427,32 @@ for name, (bhead, tail, parent) in BONES.items():
     created[name] = b
 bpy.ops.object.mode_set(mode='OBJECT')
 
+# Мягкий скиннинг блоба: верх -> head, середина -> spine, низ плавно
+# расходится на leg.L / leg.R (тело переходит в ноги и они анимируются).
 vg_spine = blob.vertex_groups.new(name='spine')
 vg_head = blob.vertex_groups.new(name='head')
+vg_legL = blob.vertex_groups.new(name='leg.L')
+vg_legR = blob.vertex_groups.new(name='leg.R')
 for v in blob.data.vertices:
-    t = (v.co.z - 1.30) / (1.75 - 1.30)
-    t = max(0.0, min(1.0, t))
-    if t < 1.0:
-        vg_spine.add([v.index], 1.0 - t, 'REPLACE')
-    if t > 0.0:
-        vg_head.add([v.index], t, 'REPLACE')
+    z = v.co.z
+    x = v.co.x
+    if z >= 1.30:
+        t = min(1.0, (z - 1.30) / 0.45)
+        if t < 1.0:
+            vg_spine.add([v.index], 1.0 - t, 'REPLACE')
+        if t > 0.0:
+            vg_head.add([v.index], t, 'REPLACE')
+    elif z >= 0.64:
+        vg_spine.add([v.index], 1.0, 'REPLACE')
+    else:
+        t = min(1.0, (0.64 - z) / 0.20)  # 0.64 -> 0.44: полностью ноги
+        side_l = max(0.0, min(1.0, (x + 0.06) / 0.12))
+        if t < 1.0:
+            vg_spine.add([v.index], 1.0 - t, 'REPLACE')
+        if t * side_l > 0.0:
+            vg_legL.add([v.index], t * side_l, 'REPLACE')
+        if t * (1.0 - side_l) > 0.0:
+            vg_legR.add([v.index], t * (1.0 - side_l), 'REPLACE')
 m = blob.modifiers.new('Armature', 'ARMATURE')
 m.object = arm_obj
 blob.parent = arm_obj
@@ -683,5 +724,9 @@ else:
         track.mute = True
     reset_pose()
     scene.frame_set(1)
+    # Кости не мешают смотреть модель: тонкие и скрыты (глаз в Outliner
+    # вернёт их для предпросмотра анимаций).
+    arm_obj.data.display_type = 'WIRE'
+    arm_obj.hide_set(True)
     print('Бруно собран в коллекцию "Bruno". Правь числа -> Run Script.')
-    print('Клипы: Bruno_Rig -> NLA -> solo трека -> Play.')
+    print('Клипы: включи глаз у Bruno_Rig в Outliner -> NLA -> solo -> Play.')
