@@ -77,7 +77,7 @@ let namePlateShown = false
 
 // --- Фоновые друзья (по спеку остаются заглушками), у песочницы ---
 const friends = createFriends()
-friends.position.set(1.8, 0, -10.4)
+friends.position.set(1.8, 0, -9.2)
 game.scene.add(friends)
 
 // --- Story: mission JSON drives everything after this point ---

@@ -7,7 +7,7 @@ import * as THREE from 'three'
 export function createWorld(scene: THREE.Scene): void {
   // Gentle sky — soft blue, slightly warm fog so distance fades calmly.
   scene.background = new THREE.Color(0xcfe8f5)
-  scene.fog = new THREE.Fog(0xcfe8f5, 30, 80)
+  scene.fog = new THREE.Fog(0xefe8d8, 26, 60)
 
   // Ground plane — muted warm green, like a quiet courtyard lawn.
   const ground = new THREE.Mesh(
@@ -23,7 +23,7 @@ export function createWorld(scene: THREE.Scene): void {
   scene.add(new THREE.AmbientLight(0xfff4e0, 0.6))
 
   // Warm directional "afternoon sun", soft shadows.
-  const sun = new THREE.DirectionalLight(0xffe8c0, 1.4)
+  const sun = new THREE.DirectionalLight(0xffe8c0, 1.55)
   sun.name = 'sun'
   sun.position.set(8, 14, 6)
   sun.castShadow = true

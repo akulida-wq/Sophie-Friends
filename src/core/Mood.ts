@@ -7,10 +7,10 @@ import type { ColorTemp, MoodSpec } from '../story/types'
  * warm as Bruno's arc progresses. Music is a logged stub until Task 9.
  */
 
-const TEMPS: Record<ColorTemp, { bg: number; sun: number }> = {
-  cool: { bg: 0xc5d6e8, sun: 0xefe8dc },
-  neutral: { bg: 0xcfe8f5, sun: 0xffe8c0 },
-  warm: { bg: 0xf3e2c4, sun: 0xffd9a0 },
+const TEMPS: Record<ColorTemp, { bg: number; sun: number; sky: number }> = {
+  cool: { bg: 0xe2e8ee, sun: 0xefe8dc, sky: 0xeef4fb },
+  neutral: { bg: 0xefe8d8, sun: 0xffe8c0, sky: 0xffffff },
+  warm: { bg: 0xf6e3c2, sun: 0xffd9a0, sky: 0xffeeda },
 }
 
 const EASE = 0.8 // very slow drift — the shift should be felt, not seen
@@ -21,6 +21,9 @@ export class Mood {
   private readonly sunCurrent = new THREE.Color()
   private readonly sunTarget = new THREE.Color()
   private readonly sun: THREE.DirectionalLight | null
+  private readonly skyCurrent = new THREE.Color(0xffffff)
+  private readonly skyTarget = new THREE.Color(0xffffff)
+  private sky: THREE.Mesh | null | undefined
 
   constructor(private readonly scene: THREE.Scene) {
     this.sun = scene.getObjectByName('sun') as THREE.DirectionalLight | null
@@ -45,6 +48,7 @@ export class Mood {
     console.log(`[Mood] color_temp -> ${temp}`)
     this.bgTarget.setHex(target.bg)
     this.sunTarget.setHex(target.sun)
+    this.skyTarget.setHex(target.sky)
   }
 
   update(dt: number): void {
@@ -54,5 +58,14 @@ export class Mood {
     if (this.scene.background instanceof THREE.Color) this.scene.background.copy(this.bgCurrent)
     if (this.scene.fog) this.scene.fog.color.copy(this.bgCurrent)
     if (this.sun) this.sun.color.copy(this.sunCurrent)
+    // купол неба подкрашивается настроением (умножение на градиент)
+    if (this.sky === undefined) {
+      this.sky = (this.scene.getObjectByName('sky-dome') as THREE.Mesh) ?? undefined
+      if (this.sky === undefined && this.scene.getObjectByName('environment')) this.sky = null
+    }
+    if (this.sky) {
+      this.skyCurrent.lerp(this.skyTarget, t)
+      ;(this.sky.material as THREE.MeshBasicMaterial).color.copy(this.skyCurrent)
+    }
   }
 }
