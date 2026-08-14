@@ -1,11 +1,20 @@
-"""Эксперимент: Tripo-меш Бруно + мой риг + мои клипы.
+"""Tripo-меш Бруно + мой риг + мои 9 клипов.
 
-Вход:  public/assets/bruno_tripo.glb (статичный меш из Tripo)
-Выход: public/assets/bruno_tripo_rigged.glb + превью-рендеры ключевых поз
-       tools/blender/preview_btr_*.png (позы ставятся напрямую, минуя
-       анимационную систему — чтобы честно увидеть растяжения скина).
+ДЛЯ ПРОСМОТРА В ОТКРЫТОМ BLENDER (твой режим):
+  Scripting -> Text -> Open (или вставь текст) -> Run Script (▶).
+  Всё строится в коллекцию "BrunoTripo", твоя сцена и Софи не трогаются;
+  повторный Run пересобирает заново.
+  Анимации: выбери BrunoTripo_Rig (включи глаз в Outliner, если скрыт) ->
+  редактор NLA -> solo (звёздочка) на треке (IdleSad, SmallWave, ...) ->
+  пробел = Play.
 
-Запуск: /Applications/Blender.app/Contents/MacOS/Blender --background --python tools/blender/build_bruno_tripo.py
+HEADLESS (экспорт + превью-рендеры, запускаю я):
+  /Applications/Blender.app/Contents/MacOS/Blender --background --python tools/blender/build_bruno_tripo.py
+  -> public/assets/bruno_tripo_rigged.glb + tools/blender/preview_btr_*.png
+
+Замечания по скину: зоны жёсткие (выше плеч — голова, кеды — ноги,
+рука владеет только трубкой вокруг своей кости); амплитуды махов рук
+ограничены ~50°, потому что в скульпте руки прижаты к телу.
 """
 
 import math
@@ -17,7 +26,12 @@ import bpy
 from mathutils import Matrix, Vector
 from mathutils.geometry import intersect_point_line
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+try:  # запуск файлом (headless или Open в Text Editor)
+    ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+except NameError:  # вставка текста в Internal
+    ROOT = "/Users/artur/Desktop/Overdone/Sophie game mock"
+if not os.path.isdir(os.path.join(ROOT, 'public')):
+    ROOT = "/Users/artur/Desktop/Overdone/Sophie game mock"
 SRC = os.path.join(ROOT, 'public', 'assets', 'bruno_tripo.glb')
 OUT = os.path.join(ROOT, 'public', 'assets', 'bruno_tripo_rigged.glb')
 PREVIEW = os.path.join(ROOT, 'tools', 'blender', 'preview_btr.png')
@@ -28,15 +42,47 @@ CLIP_NAMES = ['IdleSad', 'IdleOpen', 'Walk', 'HandToChest', 'SmallWave',
 # Морда Tripo-персонажей обычно в glTF +Z -> Blender -Y; наша конвенция +Y.
 # Если на превью окажется затылком — поменять на 0.0 и перезапустить.
 YAW_FIX = math.pi
+HEADLESS = bpy.app.background
 
-bpy.ops.wm.read_factory_settings(use_empty=True)
+if HEADLESS:
+    bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 scene.render.fps = 24
 
+# Повторный запуск в GUI: снести предыдущую сборку.
+_old = bpy.data.collections.get('BrunoTripo')
+if _old:
+    for o in list(_old.objects):
+        bpy.data.objects.remove(o, do_unlink=True)
+    bpy.data.collections.remove(_old)
+for _a in list(bpy.data.actions):
+    if _a.name.startswith('BT_'):
+        bpy.data.actions.remove(_a)
+
+bt_col = bpy.data.collections.new('BrunoTripo')
+scene.collection.children.link(bt_col)
+
+
+def _find_layer(lc, col):
+    if lc.collection == col:
+        return lc
+    for c in lc.children:
+        r = _find_layer(c, col)
+        if r:
+            return r
+    return None
+
+
+_lc = _find_layer(bpy.context.view_layer.layer_collection, bt_col)
+if _lc:
+    bpy.context.view_layer.active_layer_collection = _lc
+
+_before = set(bpy.data.objects)
 bpy.ops.import_scene.gltf(filepath=SRC)
-meshes = [o for o in bpy.data.objects if o.type == 'MESH']
+_imported = [o for o in bpy.data.objects if o not in _before]
+meshes = [o for o in _imported if o.type == 'MESH']
 body = max(meshes, key=lambda o: len(o.data.vertices))
-for o in list(bpy.data.objects):
+for o in _imported:
     if o is not body:
         bpy.data.objects.remove(o, do_unlink=True)
 
@@ -373,74 +419,77 @@ end('PlayIncluded')
 
 reset_pose()
 
-# --------------------------------------------------------------- экспорт
-for o in bpy.data.objects:
-    o.select_set(o in (arm, body))
-bpy.context.view_layer.objects.active = arm
-bpy.ops.export_scene.gltf(
-    filepath=OUT,
-    export_format='GLB',
-    use_selection=True,
-    export_apply=False,
-    export_animation_mode='NLA_TRACKS',
-    export_skins=True,
-)
-print('[export]', OUT, os.path.getsize(OUT), 'bytes')
-with open(OUT, 'rb') as fh:
-    buf = fh.read()
-json_len = struct.unpack_from('<I', buf, 12)[0]
-gltf = jsonlib.loads(buf[20:20 + json_len].decode())
-anims = [a.get('name') for a in gltf.get('animations', [])]
-print('[glb] animations:', ', '.join(anims))
-print('[glb] missing:', [c for c in CLIP_NAMES if c not in anims] or 'none')
-
-# ------------------------------------------ превью поз (напрямую, без анимации)
+# ------------------------------------------------------- финал по режимам
 for track in arm.animation_data.nla_tracks:
     track.mute = True
-
-bpy.ops.object.light_add(type='SUN', location=(2, -3, 4))
-bpy.context.active_object.data.energy = 3
-world = bpy.data.worlds.new('W') if not bpy.data.worlds else bpy.data.worlds[0]
-scene.world = world
-world.use_nodes = True
-world.node_tree.nodes['Background'].inputs[0].default_value = (0.88, 0.90, 0.94, 1)
-world.node_tree.nodes['Background'].inputs[1].default_value = 0.85
-bpy.ops.object.empty_add(location=(0, 0, 0.5 * H))
-target = bpy.context.active_object
-bpy.ops.object.camera_add(location=(1.4 * H, 1.9 * H, 1.1 * H))
-cam = bpy.context.active_object
-cam.constraints.new('TRACK_TO').target = target
-scene.camera = cam
-for engine in ('BLENDER_EEVEE_NEXT', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'):
-    try:
-        scene.render.engine = engine
-        break
-    except Exception:
-        continue
-scene.render.resolution_x = 700
-scene.render.resolution_y = 900
-scene.render.image_settings.file_format = 'PNG'
-
-
-def render_pose(label, setup):
-    reset_pose()
-    setup()
-    bpy.context.view_layer.update()
-    scene.render.filepath = PREVIEW.replace('.png', f'_{label}.png')
-    bpy.ops.render.render(write_still=True)
-
-
-render_pose('rest', lambda: None)
-render_pose('idlesad', lambda: (set_axis('spine', 0.19), set_axis('head', 0.44),
-                                set_axis('arm.L', -0.10, 'side'),
-                                set_axis('arm.R', 0.10, 'side')))
-render_pose('wave', lambda: set_axis('arm.R', 0.9, 'fwd'))
-render_pose('walk', lambda: (set_axis('leg.L', 0.45, 'fwd'),
-                             set_axis('leg.R', -0.45, 'fwd'),
-                             set_axis('arm.L', -0.16, 'fwd'),
-                             set_axis('arm.R', 0.16, 'fwd')))
-render_pose('sit', lambda: (set_axis('leg.L', 1.4, 'fwd'),
-                            set_axis('leg.R', 1.4, 'fwd'),
-                            set_axis('spine', 0.22), set_axis('head', 0.38)))
 reset_pose()
-print('[preview] wrote', PREVIEW.replace('.png', '_*.png'))
+
+if not HEADLESS:
+    arm.data.display_type = 'WIRE'
+    print('BrunoTripo собран в коллекцию "BrunoTripo".')
+    print('Клипы: выбери BrunoTripo_Rig -> NLA -> solo трека -> Play.')
+else:
+    for o in bpy.data.objects:
+        o.select_set(o in (arm, body))
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.export_scene.gltf(
+        filepath=OUT,
+        export_format='GLB',
+        use_selection=True,
+        export_apply=False,
+        export_animation_mode='NLA_TRACKS',
+        export_skins=True,
+    )
+    print('[export]', OUT, os.path.getsize(OUT), 'bytes')
+    with open(OUT, 'rb') as fh:
+        buf = fh.read()
+    json_len = struct.unpack_from('<I', buf, 12)[0]
+    gltf = jsonlib.loads(buf[20:20 + json_len].decode())
+    anims = [a.get('name') for a in gltf.get('animations', [])]
+    print('[glb] animations:', ', '.join(anims))
+    print('[glb] missing:', [c for c in CLIP_NAMES if c not in anims] or 'none')
+
+    bpy.ops.object.light_add(type='SUN', location=(2, -3, 4))
+    bpy.context.active_object.data.energy = 3
+    world = bpy.data.worlds.new('W') if not bpy.data.worlds else bpy.data.worlds[0]
+    scene.world = world
+    world.use_nodes = True
+    world.node_tree.nodes['Background'].inputs[0].default_value = (0.88, 0.90, 0.94, 1)
+    world.node_tree.nodes['Background'].inputs[1].default_value = 0.85
+    bpy.ops.object.empty_add(location=(0, 0, 0.5 * H))
+    target = bpy.context.active_object
+    bpy.ops.object.camera_add(location=(1.4 * H, 1.9 * H, 1.1 * H))
+    cam = bpy.context.active_object
+    cam.constraints.new('TRACK_TO').target = target
+    scene.camera = cam
+    for engine in ('BLENDER_EEVEE_NEXT', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'):
+        try:
+            scene.render.engine = engine
+            break
+        except Exception:
+            continue
+    scene.render.resolution_x = 700
+    scene.render.resolution_y = 900
+    scene.render.image_settings.file_format = 'PNG'
+
+    def render_pose(label, setup):
+        reset_pose()
+        setup()
+        bpy.context.view_layer.update()
+        scene.render.filepath = PREVIEW.replace('.png', f'_{label}.png')
+        bpy.ops.render.render(write_still=True)
+
+    render_pose('rest', lambda: None)
+    render_pose('idlesad', lambda: (set_axis('spine', 0.19), set_axis('head', 0.44),
+                                    set_axis('arm.L', -0.10, 'side'),
+                                    set_axis('arm.R', 0.10, 'side')))
+    render_pose('wave', lambda: set_axis('arm.R', 0.9, 'fwd'))
+    render_pose('walk', lambda: (set_axis('leg.L', 0.45, 'fwd'),
+                                 set_axis('leg.R', -0.45, 'fwd'),
+                                 set_axis('arm.L', -0.16, 'fwd'),
+                                 set_axis('arm.R', 0.16, 'fwd')))
+    render_pose('sit', lambda: (set_axis('leg.L', 1.4, 'fwd'),
+                                set_axis('leg.R', 1.4, 'fwd'),
+                                set_axis('spine', 0.22), set_axis('head', 0.38)))
+    reset_pose()
+    print('[preview] wrote', PREVIEW.replace('.png', '_*.png'))
