@@ -48,8 +48,9 @@ export class BrunoView {
     return this.state
   }
 
-  /** Заменяет плейсхолдер моделью; при неудаче остаётся серый стаб. */
-  async load(url: string): Promise<boolean> {
+  /** Заменяет плейсхолдер моделью; при неудаче остаётся серый стаб.
+   *  yaw: PI для ассетов с мордой в -Z glTF, 0 — если морда уже в +Z. */
+  async load(url: string, yaw: number = Math.PI): Promise<boolean> {
     let gltf
     try {
       gltf = await new GLTFLoader().loadAsync(url)
@@ -67,7 +68,7 @@ export class BrunoView {
     model.scale.setScalar(scale)
     model.position.y = -bounds.min.y * scale
     // Морда в -Z glTF (экспорт из +Y Blender) -> разворот к нашему +Z.
-    model.rotation.y = Math.PI
+    model.rotation.y = yaw
     model.name = 'bruno-model'
 
     for (const child of [...this.anchor.children]) child.removeFromParent()

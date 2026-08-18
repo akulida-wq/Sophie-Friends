@@ -32,7 +32,7 @@ import brunoMission from './story/bruno.json'
 
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
 const ASSET_SOPHIE = '/assets/sophie_meshy.glb?v=1'
-const ASSET_BRUNO = '/assets/bruno.glb?v=3'
+const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=2'
 const ASSET_ENV = '/assets/environment.glb?v=1'
 
 const container = document.getElementById('app')
@@ -65,7 +65,7 @@ bruno.position.set(-3, 0, -8)
 bruno.rotation.y = Math.PI / 6
 game.scene.add(bruno)
 const brunoView = new BrunoView(bruno)
-void brunoView.load(ASSET_BRUNO).then((ok) => {
+void brunoView.load(ASSET_BRUNO, 0).then((ok) => {
   // glow должен светить GLB-модель, а не снятый плейсхолдер
   if (ok) interaction.invalidate('bruno')
 })
