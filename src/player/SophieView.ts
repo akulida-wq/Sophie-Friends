@@ -33,7 +33,8 @@ export class SophieView {
   }
 
   /** Load the GLB; on failure the capsule placeholder simply stays. */
-  async load(url: string): Promise<boolean> {
+  /** yaw: PI для ассетов с мордой в -Z glTF, 0 — если морда уже в +Z. */
+  async load(url: string, yaw: number = Math.PI): Promise<boolean> {
     let gltf
     try {
       gltf = await new GLTFLoader().loadAsync(url)
@@ -55,7 +56,7 @@ export class SophieView {
     model.position.y = -bounds.min.y * scale
     // The Blender rig faces -Z after glTF export; the controller treats +Z
     // as forward. Flip the model container so she leads with her nose.
-    model.rotation.y = Math.PI
+    model.rotation.y = yaw
     model.name = 'sophie-model'
 
     // Swap out the grey capsule placeholder.

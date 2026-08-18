@@ -28,8 +28,8 @@ OUT_PREVIEW = os.path.join(ROOT, 'tools', 'blender', 'preview_bruno_meshy.png')
 HEADLESS = bpy.app.background
 
 # игровой клип <- анимация Meshy (переиспользование — это ок)
+# IdleSad собирается отдельно: спокойная стойка Idle_3 + опущенная голова.
 CLIP_MAP = {
-    'IdleSad': 'Look_Around_Dumbfounded',
     'IdleOpen': 'Idle_3',
     'Walk': 'Walking',
     'SitAlone': 'Look_Back_and_Sit',
@@ -78,6 +78,89 @@ if arm.animation_data.action:
     arm.animation_data.action = None
 for tr in list(arm.animation_data.nla_tracks):
     arm.animation_data.nla_tracks.remove(tr)
+
+# --------------------------- IdleSad: тихая стойка с опущенной головой
+# Сэмплируем спокойный Idle_3 и добавляем поверх грустный слой: голова и
+# шея вниз, лёгкая сутулость, плечи чуть внутрь. Дыхание из Idle_3
+# сохраняется — поза живая, но печальная.
+from mathutils import Euler, Quaternion
+
+for pb in arm.pose.bones:
+    pb.rotation_mode = 'QUATERNION'
+
+def _head_probe(bone, e):
+    for pb in arm.pose.bones:
+        pb.rotation_quaternion = (1, 0, 0, 0)
+    arm.pose.bones[bone].rotation_quaternion = Euler(e, 'XYZ').to_quaternion()
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    eo = arm.evaluated_get(dg)
+    return (eo.matrix_world @ eo.pose.bones['headfront'].head).z
+
+_rest_z = _head_probe('Head', (0, 0, 0))
+_cands = [((a, 0.4 * s), _head_probe('Head', [0.4 * s if i == a else 0 for i in range(3)]))
+          for a in (0, 2) for s in (1, -1)]
+(_ax, _amt), _bz = min(_cands, key=lambda kv: kv[1])
+print(f'[idlesad] head pitch-down axis={_ax} amt={_amt:+.1f} '
+      f'(dz={_bz - _rest_z:+.3f})')
+for pb in arm.pose.bones:
+    pb.rotation_quaternion = (1, 0, 0, 0)
+
+def _sad_quat(scale):
+    e = [0.0, 0.0, 0.0]
+    e[_ax] = _amt * scale
+    return Euler(e, 'XYZ').to_quaternion()
+
+SAD_OFFSET = {
+    'Head': _sad_quat(1.5),
+    'neck': _sad_quat(0.6),
+    'Spine': _sad_quat(0.35),
+    'Spine01': _sad_quat(0.2),
+}
+
+idle_act = src_actions['Idle_3']
+arm.animation_data.action = idle_act
+if hasattr(arm.animation_data, 'action_slot'):
+    try:
+        arm.animation_data.action_slot = idle_act.slots[0]
+    except Exception:
+        pass
+SAMPLES = []
+SAD_LEN = 120
+for f in range(0, SAD_LEN + 1, 5):
+    scene.frame_set(f)
+    bpy.context.view_layer.update()
+    SAMPLES.append((f + 1, {
+        pb.name: (pb.rotation_quaternion.copy(), pb.location.copy())
+        for pb in arm.pose.bones
+    }))
+arm.animation_data.action = None
+
+for f1, pose in SAMPLES:
+    for name, (q, loc) in pose.items():
+        pb = arm.pose.bones[name]
+        off = SAD_OFFSET.get(name)
+        pb.rotation_quaternion = (q @ off) if off else q
+        pb.keyframe_insert('rotation_quaternion', frame=f1)
+        if name == 'Hips':
+            pb.location = loc
+            pb.keyframe_insert('location', frame=f1)
+act = arm.animation_data.action
+act.name = 'BM_IdleSad'
+act.use_fake_user = True
+track = arm.animation_data.nla_tracks.new()
+track.name = 'IdleSad'
+strip = track.strips.new('IdleSad', 1, act)
+if hasattr(strip, 'action_slot') and getattr(strip, 'action_slot', None) is None:
+    try:
+        strip.action_slot = act.slots[0]
+    except Exception:
+        pass
+arm.animation_data.action = None
+for pb in arm.pose.bones:
+    pb.rotation_quaternion = (1, 0, 0, 0)
+    pb.location = (0, 0, 0)
+print('[idlesad] authored (Idle_3 + sad layer)')
 
 for clip, src_name in CLIP_MAP.items():
     act = src_actions[src_name].copy()
@@ -129,6 +212,10 @@ cpr.inputs['Roughness'].default_value = 0.65
 tex = clean.node_tree.nodes.new('ShaderNodeTexImage')
 tex.image = base_img
 clean.node_tree.links.new(tex.outputs['Color'], cpr.inputs['Base Color'])
+# лёгкий эмиссив тем же цветом — «мешевская» яркость под игровым светом
+if 'Emission Color' in cpr.inputs:
+    clean.node_tree.links.new(tex.outputs['Color'], cpr.inputs['Emission Color'])
+    cpr.inputs['Emission Strength'].default_value = 0.25
 char.data.materials.clear()
 char.data.materials.append(clean)
 

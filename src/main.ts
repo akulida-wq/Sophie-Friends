@@ -31,8 +31,8 @@ import type { StoryMission } from './story/types'
 import brunoMission from './story/bruno.json'
 
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
-const ASSET_SOPHIE = '/assets/sophie_meshy.glb?v=1'
-const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=2'
+const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=1'
+const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=3'
 const ASSET_ENV = '/assets/environment.glb?v=1'
 
 const container = document.getElementById('app')
@@ -42,7 +42,7 @@ const game = new Game(container)
 
 const controller = new SophieController(game)
 const sophieView = new SophieView(game.sophie)
-sophieView.load(ASSET_SOPHIE) // async; капсула остаётся при неудаче
+sophieView.load(ASSET_SOPHIE, 0) // async; капсула остаётся при неудаче
 controller.onAnimChange = (state) => sophieView.play(state)
 const followCamera = new FollowCamera(game.camera, game.sophie)
 const cinematicCamera = new CinematicCamera(game.camera)
