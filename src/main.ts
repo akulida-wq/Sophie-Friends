@@ -31,7 +31,7 @@ import type { StoryMission } from './story/types'
 import brunoMission from './story/bruno.json'
 
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
-const ASSET_SOPHIE = '/assets/sophie.glb?v=8'
+const ASSET_SOPHIE = '/assets/sophie_meshy.glb?v=1'
 const ASSET_BRUNO = '/assets/bruno.glb?v=3'
 const ASSET_ENV = '/assets/environment.glb?v=1'
 
