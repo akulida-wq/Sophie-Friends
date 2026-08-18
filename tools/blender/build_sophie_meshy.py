@@ -408,21 +408,36 @@ def _probe(key, axis, amount=0.35):
     return moved - rest
 
 def axes_for(key):
+    # Оси per-bone. Важно: 'fwd' и 'side' — всегда РАЗНЫЕ оси, иначе
+    # кейфреймы затирают друг друга (у вертикальных костей обе метрики
+    # сваливались на одну ось X).
+    b = arm.data.bones[BONES[key]]
+    bd = (b.tail_local - b.head_local).normalized()
     dx = _probe(key, 0)
     dz = _probe(key, 2)
     down = Vector((0, 0, -1))
     side = Vector((1, 0, 0))
     fwd = Vector((0, 1, 0))
+    if abs(bd.z) > 0.6:
+        # вертикальная кость (шея/голова/лапы): главное — наклон вперёд
+        if abs(dx.dot(fwd)) >= abs(dz.dot(fwd)):
+            fa, oa, fd, od = 0, 2, dx, dz
+        else:
+            fa, oa, fd, od = 2, 0, dz, dx
+        fwd_ax = (fa, 1.0 if fd.dot(fwd) > 0 else -1.0)
+        side_ax = (oa, 1.0 if od.dot(side) >= 0 else -1.0)
+        return {'pitch': fwd_ax, 'side': side_ax, 'fwd': fwd_ax}
+    # горизонтальная кость (уши/хвост/корпус): главное — вниз
     if abs(dx.dot(down)) >= abs(dz.dot(down)):
-        pitch = (0, 1.0 if dx.dot(down) > 0 else -1.0)
-        side_ax = (2, 1.0 if dz.dot(side) > 0 else -1.0)
+        pa, oa, pd, od = 0, 2, dx, dz
     else:
-        pitch = (2, 1.0 if dz.dot(down) > 0 else -1.0)
-        side_ax = (0, 1.0 if dx.dot(side) > 0 else -1.0)
-    if abs(dx.dot(fwd)) >= abs(dz.dot(fwd)):
-        fwd_ax = (0, 1.0 if dx.dot(fwd) > 0 else -1.0)
+        pa, oa, pd, od = 2, 0, dz, dx
+    pitch = (pa, 1.0 if pd.dot(down) > 0 else -1.0)
+    side_ax = (oa, 1.0 if od.dot(side) >= 0 else -1.0)
+    if abs(pd.dot(fwd)) >= abs(od.dot(fwd)):
+        fwd_ax = (pa, 1.0 if pd.dot(fwd) > 0 else -1.0)
     else:
-        fwd_ax = (2, 1.0 if dz.dot(fwd) > 0 else -1.0)
+        fwd_ax = (oa, 1.0 if od.dot(fwd) > 0 else -1.0)
     return {'pitch': pitch, 'side': side_ax, 'fwd': fwd_ax}
 
 AX = {}
@@ -535,8 +550,9 @@ for k in ('rearA1', 'rearB1'):
     kfa(k, 60, -1.5, 'fwd')
 # Настоящая посадка: попа опускается ДО ЗЕМЛИ. Меряем низ попы по мешу
 # (центральная полоса без лап), угол наклона корпуса выводим из этого.
-SIT_T = 0.5                      # ~29 град — читаемая собачья посадка
-SIT_DROP = 0.92 * math.sin(SIT_T)  # попа до земли (мех сминается в пол)
+SIT_T = 0.75                     # ~43 град — вертикальная посадка как в арте
+# −0.085: поправка дуги плеча на большом угле (по замеру лапы о землю)
+SIT_DROP = 0.92 * math.sin(SIT_T) - 0.085
 print(f'[sit] drop={SIT_DROP:.2f} tilt={math.degrees(SIT_T):.0f}deg')
 kf('root', 1, loc=(0, 0, 0))
 kf('root', 16, loc=(0, 0, -SIT_DROP))
@@ -551,11 +567,15 @@ for k in ('frontA0', 'frontB0'):
     kfa(k, 60, -SIT_T, 'fwd')
 # взгляд ровно: голова компенсирует наклон корпуса
 kfa('neck2', 1, 0.0, 'fwd')
-kfa('neck2', 16, SIT_T * 0.35, 'fwd')
-kfa('neck2', 60, SIT_T * 0.35, 'fwd')
+kfa('neck2', 16, SIT_T * 0.5, 'fwd')
+kfa('neck2', 60, SIT_T * 0.5, 'fwd')
 kfa('head', 1, 0.0, 'fwd')
-kfa('head', 16, SIT_T * 0.5, 'fwd')
-kfa('head', 60, SIT_T * 0.5, 'fwd')
+kfa('head', 16, SIT_T * 0.75, 'fwd')
+kfa('head', 60, SIT_T * 0.75, 'fwd')
+kf('head', 16, **{('x', 'y', 'z')[AX['head']['side'][0]]:
+                  0.12 * AX['head']['side'][1]})
+kf('head', 60, **{('x', 'y', 'z')[AX['head']['side'][0]]:
+                  0.12 * AX['head']['side'][1]})
 tail_wag(20, 60, period=14, amp=0.3)
 end('Sit')
 
