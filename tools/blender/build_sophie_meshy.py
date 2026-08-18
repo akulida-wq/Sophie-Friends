@@ -127,6 +127,10 @@ def eb(name, head, tail, parent=None, connect=False):
     if parent:
         b.parent = arm_data.edit_bones[parent]
         b.use_connect = connect
+    # Детерминированный ролл: у вертикальных костей local X = мировой X
+    # (чистый наклон вперёд без завала вбок), у горизонтальных local Z = верх.
+    d = (Vector(tail) - Vector(head)).normalized()
+    b.align_roll(Vector((0, -1, 0)) if abs(d.z) > 0.6 else Vector((0, 0, 1)))
     return b
 
 eb('root', Vector((0, BACK_Y, BODY_Z)), Vector((0, BACK_Y + 0.25, BODY_Z)))
@@ -168,6 +172,42 @@ BONES = {k: k for k in (
     'root', 'hip', 'chest', 'neck2', 'head', 'snout', 'earA', 'earB',
     'tail1', 'tail2', 'frontA0', 'frontA1', 'frontB0', 'frontB1',
     'rearA0', 'rearA1', 'rearB0', 'rearB1')}
+
+# ---------------------------------------------- ошейник + медальон: rigid
+# Жёсткие предметы нельзя растягивать между костями — "плывут". Находим их
+# вершины по цвету текстуры (синий ошейник, золотой жетон) в зоне шеи и
+# после сглаживания привязываем на 100% к neck2.
+uv_data = dog.data.uv_layers.active.data
+base_img = next((im for im in bpy.data.images if 'BaseColor' in im.name),
+                None)
+COLLAR = set()
+if base_img is not None:
+    IW, IH = base_img.size
+    px = list(base_img.pixels)
+    vert_uv = {}
+    for loop in dog.data.loops:
+        if loop.vertex_index not in vert_uv:
+            vert_uv[loop.vertex_index] = uv_data[loop.index].uv.copy()
+
+    def tex_rgb(uv):
+        x = min(IW - 1, max(0, int((uv.x % 1.0) * IW)))
+        y = min(IH - 1, max(0, int((uv.y % 1.0) * IH)))
+        o = (y * IW + x) * 4
+        return px[o], px[o + 1], px[o + 2]
+
+    for i, v in enumerate(dog.data.vertices):
+        uv = vert_uv.get(i)
+        if uv is None:
+            continue
+        if not (0.1 < v.co.y and BODY_Z - 0.12 < v.co.z < HEAD_BASE_Z + 0.12):
+            continue
+        r, g, b = tex_rgb(uv)
+        is_blue = b > 0.28 and b > r * 1.35 and b > g * 1.2
+        is_gold = r > 0.5 and b < 0.45 and (r - b) > 0.3
+        if is_blue or is_gold:
+            COLLAR.add(i)
+print('[collar] rigid verts:', len(COLLAR))
+assert len(COLLAR) > 200, 'ошейник по цвету не нашёлся — проверь пороги'
 
 # ------------------------------------------------------------------ скин
 # Ручной скиннинг: расстояние до сегмента кости, топ-3, жёсткие зоны.
@@ -281,6 +321,10 @@ for _pass in range(2):
         NEW.append({n: w / tot for n, w in acc.items()})
     RAW = NEW
     print(f'[skin] smoothing pass {_pass + 1} done')
+
+# жёсткая привязка ошейника/жетона — после сглаживания, чтобы не размыло
+for i in COLLAR:
+    RAW[i] = {'neck2': 1.0}
 
 for i, wmap in enumerate(RAW):
     top = sorted(wmap.items(), key=lambda kv: -kv[1])[:4]
@@ -408,7 +452,7 @@ begin(72)
 for f, z in ((1, 0.0), (36, 0.012), (72, 0.0)):
     kf('root', f, loc=(0, 0, z))
 for f, p in ((1, 0.0), (36, 0.05), (72, 0.0)):
-    kfa('neck2', f, p)
+    kfa('neck2', f, p, 'fwd')
 tail_wag(1, 72, period=18, amp=0.22)
 for f, p in ((1, 0.0), (36, 0.07), (72, 0.0)):
     kfa('earA', f, p)
@@ -427,7 +471,7 @@ for f, z in ((1, -0.008), (7, 0.012), (13, -0.008), (19, 0.012), (24, -0.008)):
     kf('root', f, loc=(0, 0, z))
 tail_wag(1, 24, period=12, amp=0.2)
 for f, p in ((1, 0.04), (13, -0.03), (24, 0.04)):
-    kfa('head', f, p)
+    kfa('head', f, p, 'fwd')
 end('Walk')
 
 # --- Run: лёгкий галоп (16f loop)
@@ -444,25 +488,40 @@ for f, p in ((1, 0.06), (9, -0.05), (16, 0.06)):
 tail_wag(1, 16, period=8, amp=0.18)
 end('Run')
 
-# --- Sit: садится и сидит, хвост медленно (60f)
+# --- Sit: попа вниз, задние лапы складываются, передние стоят (60f)
 begin(60)
+# задние лапы: небольшой вынос бедра вперёд + глубокий сгиб колена,
+# чтобы голень уходила под корпус, а не болталась в воздухе
 for k in ('rearA0', 'rearB0'):
     kfa(k, 1, 0.0, 'fwd')
-    kfa(k, 16, 1.15, 'fwd')
-    kfa(k, 60, 1.15, 'fwd')
+    kfa(k, 16, 0.55, 'fwd')
+    kfa(k, 60, 0.55, 'fwd')
 for k in ('rearA1', 'rearB1'):
     kfa(k, 1, 0.0, 'fwd')
-    kfa(k, 16, -0.9, 'fwd')
-    kfa(k, 60, -0.9, 'fwd')
+    kfa(k, 16, -1.35, 'fwd')
+    kfa(k, 60, -1.35, 'fwd')
+# наклон корпуса вокруг попы: перед поднимается на BODY_LEN*sin(t),
+# попа опускается на столько же -> плечи (и передние лапы) на месте
+SIT_T = 0.35
+SIT_DROP = 0.92 * math.sin(SIT_T)
 kf('root', 1, loc=(0, 0, 0))
-kf('root', 16, loc=(0, 0, -0.09))
-kf('root', 60, loc=(0, 0, -0.09))
+kf('root', 16, loc=(0, 0, -SIT_DROP))
+kf('root', 60, loc=(0, 0, -SIT_DROP))
 kfa('hip', 1, 0.0)
-kfa('hip', 16, -0.35)
-kfa('hip', 60, -0.35)
-kfa('neck2', 1, 0.0)
-kfa('neck2', 16, -0.12)
-kfa('neck2', 60, -0.12)
+kfa('hip', 16, -SIT_T)
+kfa('hip', 60, -SIT_T)
+# передние лапы контрятся на тот же угол назад — остаются вертикальными
+for k in ('frontA0', 'frontB0'):
+    kfa(k, 1, 0.0, 'fwd')
+    kfa(k, 16, -SIT_T, 'fwd')
+    kfa(k, 60, -SIT_T, 'fwd')
+# взгляд ровно: голова компенсирует наклон корпуса
+kfa('neck2', 1, 0.0, 'fwd')
+kfa('neck2', 16, 0.05, 'fwd')
+kfa('neck2', 60, 0.05, 'fwd')
+kfa('head', 1, 0.0, 'fwd')
+kfa('head', 16, 0.18, 'fwd')
+kfa('head', 60, 0.18, 'fwd')
 tail_wag(20, 60, period=14, amp=0.3)
 end('Sit')
 
@@ -471,8 +530,8 @@ begin(48)
 for f, z in ((1, 0.0), (8, 0.05), (14, 0.0), (22, 0.05), (28, 0.0),
              (36, 0.03), (48, 0.0)):
     kf('root', f, loc=(0, 0, z))
-kfa('neck2', 1, -0.14)
-kfa('neck2', 48, -0.14)
+kfa('neck2', 1, -0.14, 'fwd')
+kfa('neck2', 48, -0.14, 'fwd')
 tail_wag(1, 48, period=6, amp=0.5)
 for f, p in ((1, 0.0), (8, -0.18), (14, 0.06), (22, -0.18), (28, 0.0), (48, 0.0)):
     kfa('earA', f, p)
@@ -482,14 +541,14 @@ end('Happy')
 # --- Sad: голова вниз, уши повисли, хвост опущен (72f loop)
 begin(72)
 for f in (1, 72):
-    kfa('neck2', f, 0.35)
-    kfa('head', f, 0.38)
+    kfa('neck2', f, 0.35, 'fwd')
+    kfa('head', f, 0.45, 'fwd')
     kfa('earA', f, 0.4)
     kfa('earB', f, 0.4)
     kfa('tail1', f, 0.85)  # pitch+ = вниз (probe): хвост повисает
     kfa('tail2', f, 0.55)
     kf('root', f, loc=(0, 0, -0.015))
-kfa('head', 36, 0.43)
+kfa('head', 36, 0.52, 'fwd')
 end('Sad')
 
 # --- Curious: наклон головы, ухо торчком, хвост медленный (60f loop)
@@ -501,22 +560,22 @@ kfa('head', 60, 0.0, 'side')
 kfa('earA', 1, 0.0)
 kfa('earA', 18, -0.28)
 kfa('earA', 60, 0.0)
-kfa('neck2', 1, -0.06)
-kfa('neck2', 60, -0.06)
+kfa('neck2', 1, -0.06, 'fwd')
+kfa('neck2', 60, -0.06, 'fwd')
 tail_wag(1, 60, period=16, amp=0.25)
 end('Curious')
 
 # --- Sniff: нос к земле, мелкие принюхивания (60f)
 begin(60)
-kfa('neck2', 1, 0.0)
-kfa('neck2', 14, 0.55)
-kfa('neck2', 50, 0.55)
-kfa('neck2', 60, 0.1)
-kfa('head', 1, 0.0)
-kfa('head', 14, 0.4)
-for f, p in ((20, 0.3), (25, 0.45), (30, 0.3), (35, 0.45), (40, 0.3)):
-    kfa('head', f, p)
-kfa('head', 60, 0.05)
+kfa('neck2', 1, 0.0, 'fwd')
+kfa('neck2', 14, 0.6, 'fwd')
+kfa('neck2', 50, 0.6, 'fwd')
+kfa('neck2', 60, 0.1, 'fwd')
+kfa('head', 1, 0.0, 'fwd')
+kfa('head', 14, 0.45, 'fwd')
+for f, p in ((20, 0.34), (25, 0.5), (30, 0.34), (35, 0.5), (40, 0.34)):
+    kfa('head', f, p, 'fwd')
+kfa('head', 60, 0.05, 'fwd')
 tail_wag(1, 60, period=12, amp=0.2)
 end('Sniff')
 
@@ -524,7 +583,7 @@ end('Sniff')
 begin(48)
 for f, p in ((1, 0.0), (10, -0.2), (14, 0.12), (18, -0.16), (22, 0.1),
              (30, 0.0), (48, 0.0)):
-    kfa('head', f, p)
+    kfa('head', f, p, 'fwd')
 for f, z in ((1, 0.0), (10, -0.012), (14, 0.008), (22, 0.0)):
     kf('root', f, loc=(0, 0, z))
 tail_wag(1, 48, period=10, amp=0.3)
@@ -539,8 +598,8 @@ while f <= 48:
     kfa('hip', f, 0.05 * s, 'side')
     s = -s
     f += 10
-kfa('neck2', 1, -0.07)
-kfa('neck2', 48, -0.07)
+kfa('neck2', 1, -0.07, 'fwd')
+kfa('neck2', 48, -0.07, 'fwd')
 end('TailWag')
 
 # --- Jump: мягкий прыжок на месте (36f): присед -> взлёт -> приземление
@@ -560,9 +619,9 @@ for k in ('rearA0', 'rearB0'):
     kfa(k, 16, -0.35, 'fwd')
     kfa(k, 26, 0.0, 'fwd')
     kfa(k, 36, 0.0, 'fwd')
-kfa('neck2', 8, 0.1)
-kfa('neck2', 16, -0.12)
-kfa('neck2', 26, 0.0)
+kfa('neck2', 8, 0.1, 'fwd')
+kfa('neck2', 16, -0.12, 'fwd')
+kfa('neck2', 26, 0.0, 'fwd')
 tail_wag(1, 36, period=9, amp=0.3)
 for f, p in ((1, 0.0), (14, -0.15), (26, 0.0)):
     kfa('earA', f, p)
@@ -631,6 +690,9 @@ rest_tail = tail_world_pose('tail2')
 sad_tail = clip_probe('SM_Sad', 36, 'tail2')
 print(f'[verify] Sad tail droop dz={rest_tail.z - sad_tail.z:.3f} -> '
       f'{"OK" if rest_tail.z - sad_tail.z > 0.15 else "FAIL"}')
+sit_paw = clip_probe('SM_Sit', 40, 'frontA1')
+print(f'[verify] Sit front paw ground dz={sit_paw.z - rest_foot.z:+.3f} -> '
+      f'{"OK" if abs(sit_paw.z - rest_foot.z) < 0.07 else "FAIL"}')
 wag_tail = clip_probe('SM_TailWag', 6, 'tail2')
 print(f'[verify] TailWag side swing dx={abs(wag_tail.x - rest_tail.x):.3f} -> '
       f'{"OK" if abs(wag_tail.x - rest_tail.x) > 0.1 else "FAIL"}')
@@ -716,9 +778,12 @@ if HEADLESS:
                                ('jump', 'SM_Jump', 16),
                                ('wag', 'SM_TailWag', 6)):
         render_pose(label, clip, frame)
-    # Sad ещё раз строго сбоку — виден силуэт головы и хвоста
+    # Ключевые позы строго сбоку — силуэт головы, спины и хвоста
     cam.location = (2.6, -0.2, 0.15)
     render_pose('sad_side', 'SM_Sad', 36)
+    render_pose('sit_side', 'SM_Sit', 40)
+    render_pose('sniff_side', 'SM_Sniff', 30)
+    render_pose('walk_side', 'SM_Walk', 7)
     print('[preview] wrote', OUT_PREVIEW.replace('.png', '_*.png'))
 else:
     for track in arm.animation_data.nla_tracks:
