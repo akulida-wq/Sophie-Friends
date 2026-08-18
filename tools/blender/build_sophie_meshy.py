@@ -199,15 +199,36 @@ if base_img is not None:
         uv = vert_uv.get(i)
         if uv is None:
             continue
-        if not (0.1 < v.co.y and BODY_Z - 0.12 < v.co.z < HEAD_BASE_Z + 0.12):
+        if not (0.0 < v.co.y and BODY_Z - 0.2 < v.co.z < HEAD_BASE_Z + 0.15):
             continue
         r, g, b = tex_rgb(uv)
         is_blue = b > 0.28 and b > r * 1.35 and b > g * 1.2
-        is_gold = r > 0.5 and b < 0.45 and (r - b) > 0.3
+        is_gold = r > 0.5 and b < 0.45 and (r - b) > 0.25
         if is_blue or is_gold:
             COLLAR.add(i)
-print('[collar] rigid verts:', len(COLLAR))
+print('[collar] color seeds:', len(COLLAR))
 assert len(COLLAR) > 200, 'ошейник по цвету не нашёлся — проверь пороги'
+
+# У жетона есть белёсые участки (блик, окантовка) — цветом их не поймать.
+# Разрастаем захват от цветовых семян по пространственной близости, чтобы
+# вся деталь целиком стала жёсткой.
+from mathutils.kdtree import KDTree as _KD
+band = [i for i, v in enumerate(dog.data.vertices)
+        if v.co.y > 0.0 and BODY_Z - 0.2 < v.co.z < HEAD_BASE_Z + 0.15]
+kd_band = _KD(len(band))
+for i in band:
+    kd_band.insert(VS[i], i)
+kd_band.balance()
+frontier = set(COLLAR)
+for _round in range(2):
+    new = set()
+    for i in frontier:
+        for (_co, j, _d) in kd_band.find_range(VS[i], 0.022):
+            if j not in COLLAR:
+                new.add(j)
+    COLLAR |= new
+    frontier = new
+print('[collar] rigid verts after growth:', len(COLLAR))
 
 # ------------------------------------------------------------------ скин
 # Ручной скиннинг: расстояние до сегмента кости, топ-3, жёсткие зоны.
@@ -322,9 +343,11 @@ for _pass in range(2):
     RAW = NEW
     print(f'[skin] smoothing pass {_pass + 1} done')
 
-# жёсткая привязка ошейника/жетона — после сглаживания, чтобы не размыло
+# жёсткая привязка ошейника/жетона — после сглаживания, чтобы не размыло.
+# К ГРУДИ, не к шее: при поклонах головы (Sniff/Sad) ошейник остаётся
+# лежать на корпусе, как настоящий, и жетон не въезжает в грудь.
 for i in COLLAR:
-    RAW[i] = {'neck2': 1.0}
+    RAW[i] = {'chest': 1.0}
 
 for i, wmap in enumerate(RAW):
     top = sorted(wmap.items(), key=lambda kv: -kv[1])[:4]
