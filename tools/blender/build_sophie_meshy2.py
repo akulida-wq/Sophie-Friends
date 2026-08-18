@@ -282,10 +282,35 @@ def tail_wag(f0, f1, period=8, amp=0.45):
 
 L = S  # масштаб для location-амплитуд (рост модели)
 
-# --- Walk / Run: цикл Meshy как есть (Run — ускоренная копия)
+
+def strip_scale_curves(act):
+    """Blender 5: кривые в channelbags слоёв. Убираем scale-треки."""
+    removed = 0
+    try:
+        fcs = act.fcurves
+        for fc in list(fcs):
+            if fc.data_path.endswith('.scale'):
+                fcs.remove(fc)
+                removed += 1
+        return removed
+    except AttributeError:
+        pass
+    for layer in act.layers:
+        for strip in layer.strips:
+            for cb in strip.channelbags:
+                for fc in list(cb.fcurves):
+                    if fc.data_path.endswith('.scale'):
+                        cb.fcurves.remove(fc)
+                        removed += 1
+    return removed
+
+# --- Walk / Run: цикл Meshy как есть (Run — ускоренная копия).
+# ВАЖНО: у Meshy в кривых есть scale-треки (сжимают скелет до ~0.68 в
+# движении) — вырезаем, масштаб костей анимировать нельзя.
 for clip, scale in (('Walk', 1.0), ('Run', 0.55)):
     act = walk_src.copy()
     act.name = f'S2_{clip}'
+    print(f'[scale-strip] {clip}:', strip_scale_curves(act), 'curves removed')
     act.use_fake_user = True
     track = arm.animation_data.nla_tracks.new()
     track.name = clip
@@ -315,7 +340,7 @@ end('Idle')
 # попа сама не опускается — её сажает root-drop. Drop чуть больше подъёма
 # плеч, чтобы попа дошла до земли, а лапы остались на месте.
 SIT_T = 0.55
-SIT_DROP = BODY_LEN * math.sin(SIT_T) - 0.024  # по замеру лапы
+SIT_DROP = BODY_LEN * math.sin(SIT_T) + 0.012  # по замеру лапы
 begin(60)
 for k in ('rA0', 'rB0'):
     kfa(k, 1, 0.0, 'fwd')
@@ -485,8 +510,8 @@ for mat in dog.data.materials:
     if base_link and 'Emission Color' in pr.inputs:
         src_sock = base_link[0].from_socket
         mat.node_tree.links.new(src_sock, pr.inputs['Emission Color'])
-        pr.inputs['Emission Strength'].default_value = 0.25
-        print('[mat] emissive lift 0.25 on', mat.name)
+        pr.inputs['Emission Strength'].default_value = 0.07
+        print('[mat] emissive lift 0.07 on', mat.name)
 
 for img in bpy.data.images:
     if max(img.size) > 2048:

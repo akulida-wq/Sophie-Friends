@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { GameStateMachine } from './GameState'
 import { createWorld } from './World'
 import { createSophiePlaceholder } from '../player/SophiePlaceholder'
@@ -23,8 +24,14 @@ export class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.shadowMap.enabled = true
-    this.renderer.shadowMap.type = THREE.PCFShadowMap
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     container.appendChild(this.renderer.domElement)
+
+    // Мягкое IBL-окружение: PBR-материалы (Софи, Бруно) получают
+    // студийные отражения и заполняющий свет вместо плоской серости.
+    const pmrem = new THREE.PMREMGenerator(this.renderer)
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    this.scene.environmentIntensity = 0.45
 
     this.camera = new THREE.PerspectiveCamera(
       45,
