@@ -527,16 +527,17 @@ begin(60)
 # чтобы голень уходила под корпус, а не болталась в воздухе
 for k in ('rearA0', 'rearB0'):
     kfa(k, 1, 0.0, 'fwd')
-    kfa(k, 16, 0.55, 'fwd')
-    kfa(k, 60, 0.55, 'fwd')
+    kfa(k, 16, 0.85, 'fwd')
+    kfa(k, 60, 0.85, 'fwd')
 for k in ('rearA1', 'rearB1'):
     kfa(k, 1, 0.0, 'fwd')
-    kfa(k, 16, -1.35, 'fwd')
-    kfa(k, 60, -1.35, 'fwd')
-# наклон корпуса вокруг попы: перед поднимается на BODY_LEN*sin(t),
-# попа опускается на столько же -> плечи (и передние лапы) на месте
-SIT_T = 0.35
-SIT_DROP = 0.92 * math.sin(SIT_T)
+    kfa(k, 16, -1.5, 'fwd')
+    kfa(k, 60, -1.5, 'fwd')
+# Настоящая посадка: попа опускается ДО ЗЕМЛИ. Меряем низ попы по мешу
+# (центральная полоса без лап), угол наклона корпуса выводим из этого.
+SIT_T = 0.5                      # ~29 град — читаемая собачья посадка
+SIT_DROP = 0.92 * math.sin(SIT_T)  # попа до земли (мех сминается в пол)
+print(f'[sit] drop={SIT_DROP:.2f} tilt={math.degrees(SIT_T):.0f}deg')
 kf('root', 1, loc=(0, 0, 0))
 kf('root', 16, loc=(0, 0, -SIT_DROP))
 kf('root', 60, loc=(0, 0, -SIT_DROP))
@@ -550,11 +551,11 @@ for k in ('frontA0', 'frontB0'):
     kfa(k, 60, -SIT_T, 'fwd')
 # взгляд ровно: голова компенсирует наклон корпуса
 kfa('neck2', 1, 0.0, 'fwd')
-kfa('neck2', 16, 0.05, 'fwd')
-kfa('neck2', 60, 0.05, 'fwd')
+kfa('neck2', 16, SIT_T * 0.35, 'fwd')
+kfa('neck2', 60, SIT_T * 0.35, 'fwd')
 kfa('head', 1, 0.0, 'fwd')
-kfa('head', 16, 0.18, 'fwd')
-kfa('head', 60, 0.18, 'fwd')
+kfa('head', 16, SIT_T * 0.5, 'fwd')
+kfa('head', 60, SIT_T * 0.5, 'fwd')
 tail_wag(20, 60, period=14, amp=0.3)
 end('Sit')
 
