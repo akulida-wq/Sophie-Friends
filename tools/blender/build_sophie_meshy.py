@@ -294,14 +294,24 @@ for i, v in enumerate(dog.data.vertices):
         else:
             if is_leg:
                 continue  # вне колонн лапы не тянут
-            if co.z > HEAD_Z and co.y > FRONT_Y - 0.1:
-                # купол головы: голова/морда/уши (+шея у основания)
+            # Голова = купол СВЕРХУ + выступ морды/подбородка СПЕРЕДИ:
+            # рот ниже купола, но он часть головы, иначе его рвёт на
+            # границе голова/шея при поворотах.
+            in_head = ((co.z > HEAD_Z and co.y > FRONT_Y - 0.1)
+                       or (co.y > HEAD_C.y + 0.15 and co.z > BODY_Z + 0.1))
+            if in_head:
                 if name in ('hip', 'chest', 'tail1', 'tail2'):
+                    continue
+                # уши не трогают лицо (глаза!): только боковины и затылок
+                if is_ear and abs(co.x) < 0.30 and co.y > HEAD_C.y:
                     continue
                 if is_ear and abs(co.x) < EAR_X:
                     d *= 2.5
                 if not is_headish and name != 'neck2':
                     continue
+                # шея подмешивается только узкой полосой у основания
+                if name == 'neck2':
+                    d *= 2.8
             else:
                 if is_ear:
                     continue
