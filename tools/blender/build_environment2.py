@@ -39,39 +39,47 @@ def b(x_three, z_three):
     return (x_three, -z_three)
 
 # ------------------------------------------------------------ helpers
-def clean_material(obj, tex_size=1024, roughness=0.8):
-    src_img = None
+def clean_material(obj, tex_size=2048, roughness=None):
+    """Щадящий ремонт родного материала Meshy: убираем только мусор
+    (эмиссив-дубль, накрученный спекуляр, ложную прозрачность). Базовый
+    цвет, normal map и roughness-карта остаются оригинальными — модель
+    выглядит на ~100% как в Meshy."""
+    imgs = set()
     for mat in obj.data.materials:
         if not mat or not mat.use_nodes:
             continue
-        pr = next((n for n in mat.node_tree.nodes
-                   if n.type == 'BSDF_PRINCIPLED'), None)
+        nt = mat.node_tree
+        pr = next((n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED'), None)
         if pr is None:
             continue
-        inp = pr.inputs.get('Base Color')
-        node = inp.links[0].from_node if (inp and inp.links) else None
-        for _ in range(4):
-            if node is None:
-                break
-            if node.type == 'TEX_IMAGE':
-                src_img = node.image
-                break
-            node = (node.inputs[0].links[0].from_node
-                    if node.inputs and node.inputs[0].links else None)
-        if src_img:
-            break
-    clean = bpy.data.materials.new(obj.name + 'Mat')
-    clean.use_nodes = True
-    cpr = next(n for n in clean.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
-    cpr.inputs['Roughness'].default_value = roughness
-    if src_img is not None:
-        if max(src_img.size) > tex_size:
-            src_img.scale(tex_size, tex_size)
-        tex = clean.node_tree.nodes.new('ShaderNodeTexImage')
-        tex.image = src_img
-        clean.node_tree.links.new(tex.outputs['Color'], cpr.inputs['Base Color'])
-    obj.data.materials.clear()
-    obj.data.materials.append(clean)
+        ec = pr.inputs.get('Emission Color')
+        if ec:
+            for l in list(ec.links):
+                nt.links.remove(l)
+        if 'Emission Strength' in pr.inputs:
+            pr.inputs['Emission Strength'].default_value = 0.0
+        for nm in ('Specular IOR Level', 'Specular Tint'):
+            inp = pr.inputs.get(nm)
+            if inp:
+                for l in list(inp.links):
+                    nt.links.remove(l)
+                if nm == 'Specular IOR Level':
+                    inp.default_value = 0.5
+        a = pr.inputs.get('Alpha')
+        if a:
+            for l in list(a.links):
+                nt.links.remove(l)
+            a.default_value = 1.0
+        try:
+            mat.blend_method = 'OPAQUE'
+        except Exception:
+            pass
+        for n in nt.nodes:
+            if n.type == 'TEX_IMAGE' and n.image is not None:
+                imgs.add(n.image)
+    for img in imgs:
+        if max(img.size) > tex_size:
+            img.scale(tex_size, tex_size)
 
 
 def decimate(obj, target_polys):
@@ -182,6 +190,10 @@ F = {
     'daisy': 'Meshy_AI_Fabric_Daisy_Garden_0820122159_texture.glb',
     'cloud': 'Meshy_AI_Soft_Cloud_Cluster_0820122418_texture.glb',
     'ball': 'Meshy_AI_Vintage_Kickoff_0820122137_texture.glb',
+    'blocks': 'Meshy_AI_Alphabet_Blocks_0820155120_texture.glb',
+    'chalk': 'Meshy_AI_Colorful_Chalk_Sticks_0820155913_texture.glb',
+    'gate': 'Meshy_AI_Rustic_Wooden_Garden__0820155303_texture.glb',
+    'pave': 'Meshy_AI_Rounded_Concrete_Pave_0820155531_texture.glb',
 }
 
 # бюджеты подняты: видимой потери качества быть не должно
@@ -197,24 +209,10 @@ grass = load_asset(F['grass'], 'GrassTuft', height=0.26, polys=450, tex=512)
 daisy = load_asset(F['daisy'], 'Daisy0', height=0.55, polys=9000, tex=512)
 cloud = load_asset(F['cloud'], 'Cloud1', width=4.5, polys=5000, tex=256)
 ball = load_asset(F['ball'], 'Ball', height=0.55, polys=6000, tex=512)
-
-# ------------------------------------------------- Blocks/Chalk из старого
-pre = set(bpy.data.objects)
-bpy.ops.import_scene.gltf(filepath=OLD_ENV)
-new = [o for o in bpy.data.objects if o not in pre]
-kept_old = []
-for want in ('Blocks', 'Chalk'):
-    node = next((o for o in new if o.name.split('.')[0] == want), None)
-    if node is not None:
-        kept_old.append(node)
-        node.name = want
-        kept_old.extend(node.children_recursive)
-keep_set = set(kept_old)
-for o in new:
-    if o not in keep_set:
-        bpy.data.objects.remove(o, do_unlink=True)
-blocks = bpy.data.objects.get('Blocks')
-chalk = bpy.data.objects.get('Chalk')
+blocks = load_asset(F['blocks'], 'Blocks', width=1.1, polys=9000, tex=1024)
+chalk = load_asset(F['chalk'], 'Chalk', width=0.9, polys=6000, tex=512)
+gate = load_asset(F['gate'], 'Gate', width=3.4, polys=10000, tex=1024)
+pave = load_asset(F['pave'], 'PaveTile', width=0.98, polys=900, tex=512)
 
 # ------------------------------------------------------- двор: композиция
 # Дом СПРАВА, крыльцом на запад (в сторону двора и улицы).
@@ -227,11 +225,10 @@ place(sandbox, b(7.4, -9.4), rot_deg=-12)
 place(bench, b(6.2, 8.6), rot_deg=-115)
 
 # интерактив по всей территории
-place(ball, b(8.6, 5.4), rot_deg=20)          # юго-восток
-if blocks:
-    blocks.location = (*b(-9.4, -2.0), 0)      # запад
-if chalk:
-    chalk.location = (*b(-5.6, 3.4), 0)        # у дорожки, юго-запад
+place(ball, b(8.6, 5.4), rot_deg=20)           # юго-восток
+place(blocks, b(-9.4, -2.0), rot_deg=25)       # запад
+place(chalk, b(-5.6, 3.4), rot_deg=-40)        # у дорожки, юго-запад
+place(gate, b(-15.8, 1.5), rot_deg=-90)        # калитка в проёме ворот
 
 place(tree, b(-8.6, -6.4), rot_deg=30)         # интерактивное дерево, СЗ
 t1 = linked_copy(tree, 'TreeDeco1')
@@ -309,20 +306,44 @@ def path_tiles(boxes, cols, x0, z0, x1, z1):
             boxes.append((cx, -cz, 0.02, TILE, TILE, 0.055))
             cols.append((shade + warm, shade, shade - warm * 0.5))
 
-pt_boxes, pt_cols = [], []
-path_tiles(pt_boxes, pt_cols, -15.8, 1.4, 7.2, 1.4)   # ворота(запад) -> дом
-path_tiles(pt_boxes, pt_cols, 1.4, 0.6, 1.4, -13.2)   # ветка на площадку
-boxes_mesh('Path', pt_boxes, pt_cols)
+tiles_parent = bpy.data.objects.new('Path', None)
+scene.collection.objects.link(tiles_parent)
+_tile_i = 0
+
+def lay_tiles(x0, z0, x1, z1):
+    global _tile_i
+    horizontal = abs(x1 - x0) > abs(z1 - z0)
+    length = abs((x1 - x0) if horizontal else (z1 - z0))
+    n = int(length / (TILE + GAP)) + 1
+    for i in range(n):
+        t = i * (TILE + GAP)
+        for lane in (-0.55, 0.55):
+            cx = (min(x0, x1) + t) if horizontal else (x0 + lane)
+            cz = (z0 + lane) if horizontal else (min(z0, z1) + t)
+            tl = pave if _tile_i == 0 else linked_copy(pave, f'PaveTile{_tile_i}')
+            tl.rotation_mode = 'XYZ'
+            tl.location = (cx, -cz, 0.0)
+            tl.rotation_euler = (0, 0, math.radians(random.choice([0, 90, 180, 270])))
+            sc = 1.0 + random.uniform(-0.02, 0.02)
+            tl.scale = (sc, sc, 1.0)
+            tl.parent = tiles_parent
+            _tile_i += 1
+
+lay_tiles(-15.8, 1.4, 7.2, 1.4)   # ворота(запад) -> дом
+lay_tiles(1.4, 0.6, 1.4, -13.2)   # ветка на площадку
+print(f'[path] {_tile_i} tiles')
 
 # ------------------------------------- улица слева: тротуар/бордюр/дорога
-side_boxes, side_cols = [], []
+side_parent = bpy.data.objects.new('Sidewalk', None)
+scene.collection.objects.link(side_parent)
 for i in range(int(64 / (TILE + GAP))):
     t = -32 + i * (TILE + GAP)
     for lane in (-17.15, -18.15):
-        shade = 0.6 + random.uniform(-0.04, 0.04)
-        side_boxes.append((lane, t, 0.015, TILE, TILE, 0.05))
-        side_cols.append((shade, shade, shade - 0.02))
-boxes_mesh('Sidewalk', side_boxes, side_cols)
+        tl = linked_copy(pave, f'SideTile{_tile_i + i * 2}')
+        tl.rotation_mode = 'XYZ'
+        tl.location = (lane, t, 0.0)
+        tl.rotation_euler = (0, 0, math.radians(random.choice([0, 90, 180, 270])))
+        tl.parent = side_parent
 boxes_mesh('Curb', [(-18.9, 0, 0.0, 0.45, 64, 0.15)], [(0.63, 0.63, 0.6)])
 road_boxes = [(-21.6, 0, -0.015, 4.6, 64, 0.05)]
 road_cols = [(0.33, 0.34, 0.36)]
