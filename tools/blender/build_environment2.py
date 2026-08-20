@@ -1,14 +1,14 @@
-"""Двор дома + улица (v2.1) из ассетов Meshy ("3d meshed elements").
+"""Двор дома + улица слева (v2.2) из ассетов Meshy ("3d meshed elements").
 
 Выход: public/assets/environment2.glb
- - квадратный огороженный двор ~33x33 (там гуляем), забор по периметру
-   с воротами на юг; плиточная дорожка от ворот к площадке и к дому;
- - большой жилой дом (масштаб к Софи/Бруно), игровая зона, скамейка,
-   деревья/кусты/ромашки;
- - за забором: тротуар-бордюр, дорога с разметкой, дома соседей и
-   деревья (декорации, ходить туда нельзя — движок не даёт);
- - облака Cloud1..4 (движок дрейфует), GrassTuft под землёй — источник
-   инстансированной травы.
+ - квадратный огороженный двор ~32x32; ворота на ЗАПАД к улице;
+ - улица СЛЕВА (видна в кадре): тротуар из плит, бордюр, дорога с жёлтой
+   пунктирной разметкой и белыми краевыми линиями, дома соседей фасадами
+   к дороге, деревья;
+ - дом справа (восток), крыльцом на запад во двор; дорожка от ворот к
+   дому + ветка на площадку;
+ - игровые элементы раскиданы по двору; качество моделей повышено;
+ - Cloud1..4 дрейфуют, GrassTuft — источник инстансированной травы.
 
 Запуск:
   /Applications/Blender.app/Contents/MacOS/Blender --background \
@@ -32,10 +32,9 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 random.seed(7)
 
-YARD = 15.8          # полудлина забора; газон двора ~16.5
-GATE_X = (0.0, 3.0)  # проём ворот на СЕВЕРНОЙ стороне (к улице)
+YARD = 15.8
+GATE_Z = (0.0, 3.0)   # проём ворот на западной стороне (three-z диапазон)
 
-# три-координаты (x, z) -> блендер (x, -z)
 def b(x_three, z_three):
     return (x_three, -z_three)
 
@@ -125,7 +124,7 @@ def load_asset(fname, name, height=None, width=None, polys=8000, tex=1024):
 
 
 def place(obj, xz, rot_deg=0.0, scale=1.0):
-    obj.rotation_mode = 'XYZ'  # glTF-импорт даёт QUATERNION: euler молча игнорится!
+    obj.rotation_mode = 'XYZ'  # glTF-импорт даёт QUATERNION: euler игнорится
     obj.location = (xz[0], xz[1], 0)
     obj.rotation_euler = (0, 0, math.radians(rot_deg))
     obj.scale = (scale, scale, scale)
@@ -138,12 +137,8 @@ def linked_copy(obj, name):
     return c
 
 
-def boxes_mesh(name, boxes, colors):
-    """Один меш из набора боксов (cx, cy, z0, w, d, h) c пер-боксовым
-    цветом (vertex color 'Col') — дорожка, дорога, разметка."""
-    verts = []
-    faces = []
-    cols = []
+def boxes_mesh(name, boxes, colors, roughness=0.9):
+    verts, faces, cols = [], [], []
     for (cx, cy, z0, w, d, h), col in zip(boxes, colors):
         i = len(verts)
         x0, x1 = cx - w / 2, cx + w / 2
@@ -164,7 +159,7 @@ def boxes_mesh(name, boxes, colors):
     mat = bpy.data.materials.new(name + 'Mat')
     mat.use_nodes = True
     pr = next(n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
-    pr.inputs['Roughness'].default_value = 0.9
+    pr.inputs['Roughness'].default_value = roughness
     vc = mat.node_tree.nodes.new('ShaderNodeVertexColor')
     vc.layer_name = 'Col'
     mat.node_tree.links.new(vc.outputs['Color'], pr.inputs['Base Color'])
@@ -189,18 +184,19 @@ F = {
     'ball': 'Meshy_AI_Vintage_Kickoff_0820122137_texture.glb',
 }
 
-house = load_asset(F['house'], 'House', height=5.6, polys=22000)
-fence = load_asset(F['fence'], 'FenceSeg', width=2.3, polys=1500, tex=512)
-slide = load_asset(F['slide'], 'Slide', height=2.3, polys=8000)
-swing = load_asset(F['swing'], 'Swing', height=2.4, polys=8000)
-sandbox = load_asset(F['sandbox'], 'Sandbox', width=3.0, polys=7000)
-bench = load_asset(F['bench'], 'Bench', width=1.9, polys=5000)
-tree = load_asset(F['tree'], 'Tree', height=4.3, polys=11000)
-bush = load_asset(F['bush'], 'Bush0', width=1.6, polys=6000, tex=512)
-grass = load_asset(F['grass'], 'GrassTuft', height=0.3, polys=700, tex=512)
-daisy = load_asset(F['daisy'], 'Daisy0', height=0.55, polys=4000, tex=512)
-cloud = load_asset(F['cloud'], 'Cloud1', width=4.5, polys=2500, tex=256)
-ball = load_asset(F['ball'], 'Ball', height=0.55, polys=2200, tex=512)
+# бюджеты подняты: видимой потери качества быть не должно
+house = load_asset(F['house'], 'House', height=5.6, polys=60000, tex=2048)
+fence = load_asset(F['fence'], 'FenceSeg', width=2.3, polys=3500, tex=512)
+slide = load_asset(F['slide'], 'Slide', height=2.3, polys=20000)
+swing = load_asset(F['swing'], 'Swing', height=2.4, polys=20000)
+sandbox = load_asset(F['sandbox'], 'Sandbox', width=3.0, polys=18000)
+bench = load_asset(F['bench'], 'Bench', width=1.9, polys=12000)
+tree = load_asset(F['tree'], 'Tree', height=4.3, polys=30000)
+bush = load_asset(F['bush'], 'Bush0', width=1.6, polys=12000, tex=512)
+grass = load_asset(F['grass'], 'GrassTuft', height=0.26, polys=450, tex=512)
+daisy = load_asset(F['daisy'], 'Daisy0', height=0.55, polys=9000, tex=512)
+cloud = load_asset(F['cloud'], 'Cloud1', width=4.5, polys=5000, tex=256)
+ball = load_asset(F['ball'], 'Ball', height=0.55, polys=6000, tex=512)
 
 # ------------------------------------------------- Blocks/Chalk из старого
 pre = set(bpy.data.objects)
@@ -221,43 +217,45 @@ blocks = bpy.data.objects.get('Blocks')
 chalk = bpy.data.objects.get('Chalk')
 
 # ------------------------------------------------------- двор: композиция
-# Дом — большой, в северо-западном углу, крыльцом на юго-восток к дорожке.
-place(house, b(-9.8, -10.6), rot_deg=65)
+# Дом СПРАВА, крыльцом на запад (в сторону двора и улицы).
+place(house, b(10.2, -3.0), rot_deg=-82)
 
-# игровая зона на севере двора
+# площадка на севере
 place(slide, b(-3.0, -11.6), rot_deg=15)
 place(swing, b(4.4, -12.6), rot_deg=4)
-place(sandbox, b(7.0, -9.6), rot_deg=-12)
-place(bench, b(9.2, -3.2), rot_deg=-65)
-place(ball, b(3.5, 1.5), rot_deg=20)
-if blocks:
-    blocks.location = (-4.5, 3.0, 0)
-if chalk:
-    chalk.location = (2.6, 5.2, 0)   # мел у дорожки — рисовать на плитке
+place(sandbox, b(7.4, -9.4), rot_deg=-12)
+place(bench, b(6.2, 8.6), rot_deg=-115)
 
-place(tree, b(7.2, -6.2), rot_deg=30)
+# интерактив по всей территории
+place(ball, b(8.6, 5.4), rot_deg=20)          # юго-восток
+if blocks:
+    blocks.location = (*b(-9.4, -2.0), 0)      # запад
+if chalk:
+    chalk.location = (*b(-5.6, 3.4), 0)        # у дорожки, юго-запад
+
+place(tree, b(-8.6, -6.4), rot_deg=30)         # интерактивное дерево, СЗ
 t1 = linked_copy(tree, 'TreeDeco1')
-place(t1, b(-14.0, -13.5), rot_deg=140, scale=0.92)
+place(t1, b(-13.6, -13.4), rot_deg=140, scale=0.92)
 t2 = linked_copy(tree, 'TreeDeco2')
-place(t2, b(13.4, -13.8), rot_deg=260, scale=1.1)
+place(t2, b(13.5, -13.6), rot_deg=260, scale=1.08)
 t3 = linked_copy(tree, 'TreeDeco3')
-place(t3, b(-13.8, 7.5), rot_deg=80, scale=0.85)
+place(t3, b(-12.6, 11.8), rot_deg=80, scale=0.85)
 
 bushes_parent = bpy.data.objects.new('Bushes', None)
 scene.collection.objects.link(bushes_parent)
-BUSH_SPOTS = [((-6.0, -13.8), 0, 1.0), ((13.9, -7.0), 70, 0.85),
-              ((-14.2, 0.5), 30, 0.9), ((10.2, 5.0), 160, 0.8),
-              ((14.1, 10.5), 200, 0.9), ((-9.0, 12.5), 300, 0.85),
-              ((-14.0, 13.8), 260, 0.8), ((12.0, 14.0), 120, 0.75)]
+BUSH_SPOTS = [((-6.2, -13.9), 0, 1.0), ((13.9, -7.2), 70, 0.85),
+              ((-14.3, -2.0), 30, 0.9), ((10.4, 13.6), 160, 0.8),
+              ((14.2, 9.0), 200, 0.9), ((-8.8, 13.9), 300, 0.85),
+              ((0.6, 13.8), 260, 0.8), ((13.8, 1.4), 120, 0.75)]
 for i, (xz, rd, sc) in enumerate(BUSH_SPOTS):
     bobj = bush if i == 0 else linked_copy(bush, f'Bush{i}')
     place(bobj, b(*xz), rot_deg=rd, scale=sc)
     bobj.parent = bushes_parent
 
-DAISY_SPOTS = [((3.6, -3.0), 15, 1.0), ((-6.6, -5.0), 120, 0.85),
-               ((5.2, -11.6), 230, 0.9), ((-11.5, 2.0), 60, 0.8),
-               ((11.6, -10.6), 310, 0.75), ((-4.0, 10.5), 200, 0.9),
-               ((8.5, 12.0), 40, 0.8)]
+DAISY_SPOTS = [((4.0, -4.2), 15, 1.0), ((-11.8, -9.2), 120, 0.85),
+               ((5.6, -11.8), 230, 0.9), ((-12.0, 5.4), 60, 0.8),
+               ((11.8, -11.2), 310, 0.75), ((-3.6, 11.4), 200, 0.9),
+               ((12.4, 5.2), 40, 0.8), ((-9.0, 8.0), 150, 0.85)]
 for i, (xz, rd, sc) in enumerate(DAISY_SPOTS):
     dobj = daisy if i == 0 else linked_copy(daisy, f'Daisy{i}')
     place(dobj, b(*xz), rot_deg=rd, scale=sc)
@@ -280,13 +278,13 @@ def fence_at(x_b, y_b, rot_z):
 
 for i in range(n_side):
     x = -YARD + SEG / 2 + i * SEG
-    fence_at(x, -YARD, 0)                            # юг (за камерой)
-    # север (y_b = +YARD, виден всегда): проём ворот к улице
-    if not (GATE_X[0] - SEG / 2 < x < GATE_X[1] + SEG / 2):
-        fence_at(x, YARD, math.pi)
+    fence_at(x, -YARD, 0)                            # юг
+    fence_at(x, YARD, math.pi)                       # север
 for i in range(n_side):
     y = -YARD + SEG / 2 + i * SEG
-    fence_at(-YARD, y, -math.pi / 2)                 # запад
+    # запад: проём ворот к улице (three z 0..3 -> y_b -3..0)
+    if not (-GATE_Z[1] - SEG / 2 < y < -GATE_Z[0] + SEG / 2):
+        fence_at(-YARD, y, -math.pi / 2)
     fence_at(YARD, y, math.pi / 2)                   # восток
 print(f'[fence] {idx} segments')
 
@@ -294,7 +292,6 @@ print(f'[fence] {idx} segments')
 TILE = 0.92
 GAP = 0.14
 def path_tiles(boxes, cols, x0, z0, x1, z1):
-    """Полоса плиток шириной 2 плитки от (x0,z0) до (x1,z1) (three-коорд.)"""
     horizontal = abs(x1 - x0) > abs(z1 - z0)
     length = abs((x1 - x0) if horizontal else (z1 - z0))
     n = int(length / (TILE + GAP)) + 1
@@ -313,41 +310,53 @@ def path_tiles(boxes, cols, x0, z0, x1, z1):
             cols.append((shade + warm, shade, shade - warm * 0.5))
 
 pt_boxes, pt_cols = [], []
-path_tiles(pt_boxes, pt_cols, 1.4, -15.8, 1.4, 8.0)    # ворота(север) -> двор
-path_tiles(pt_boxes, pt_cols, -7.0, -8.6, 1.4, -8.6)   # ветка к крыльцу дома
-path = boxes_mesh('Path', pt_boxes, pt_cols)
+path_tiles(pt_boxes, pt_cols, -15.8, 1.4, 7.2, 1.4)   # ворота(запад) -> дом
+path_tiles(pt_boxes, pt_cols, 1.4, 0.6, 1.4, -13.2)   # ветка на площадку
+boxes_mesh('Path', pt_boxes, pt_cols)
 
-# --------------------------------------------- улица: дорога + разметка
-road_boxes = [(0, 20.0, -0.015, 64, 4.4, 0.05)]
-road_cols = [(0.34, 0.35, 0.37)]
-curb_boxes = [(0, 17.55, 0.0, 64, 0.5, 0.14)]
-curb_cols = [(0.62, 0.62, 0.6)]
-dash_boxes = []
-dash_cols = []
+# ------------------------------------- улица слева: тротуар/бордюр/дорога
+side_boxes, side_cols = [], []
+for i in range(int(64 / (TILE + GAP))):
+    t = -32 + i * (TILE + GAP)
+    for lane in (-17.15, -18.15):
+        shade = 0.6 + random.uniform(-0.04, 0.04)
+        side_boxes.append((lane, t, 0.015, TILE, TILE, 0.05))
+        side_cols.append((shade, shade, shade - 0.02))
+boxes_mesh('Sidewalk', side_boxes, side_cols)
+boxes_mesh('Curb', [(-18.9, 0, 0.0, 0.45, 64, 0.15)], [(0.63, 0.63, 0.6)])
+road_boxes = [(-21.6, 0, -0.015, 4.6, 64, 0.05)]
+road_cols = [(0.33, 0.34, 0.36)]
+# жёлтый пунктир по центру + белые краевые линии
+dash_boxes, dash_cols = [], []
 for i in range(16):
-    dash_boxes.append((-30 + i * 4.0, 20.0, 0.04, 1.6, 0.22, 0.012))
-    dash_cols.append((0.92, 0.92, 0.88))
+    dash_boxes.append((-21.6, -30 + i * 4.0, 0.045, 0.24, 1.7, 0.012))
+    dash_cols.append((0.95, 0.75, 0.15))
+for edge in (-19.5, -23.7):
+    dash_boxes.append((edge, 0, 0.045, 0.16, 63, 0.01))
+    dash_cols.append((0.9, 0.9, 0.86))
 boxes_mesh('Road', road_boxes + dash_boxes, road_cols + dash_cols)
-boxes_mesh('Curb', curb_boxes, curb_cols)
 
-# дома соседей и зелень за дорогой (декорации)
+# дома соседей за дорогой, фасадами на восток (к дороге и нам)
 n1 = linked_copy(house, 'NeighborHouse1')
-place(n1, b(-15.0, -26.0), rot_deg=-8, scale=0.92)
+place(n1, b(-28.5, -12.0), rot_deg=95, scale=0.92)
 n2 = linked_copy(house, 'NeighborHouse2')
-place(n2, b(9.0, -27.0), rot_deg=8, scale=1.05)
+place(n2, b(-29.0, 2.0), rot_deg=82, scale=1.02)
 n3 = linked_copy(house, 'NeighborHouse3')
-place(n3, b(26.0, -24.5), rot_deg=-20, scale=0.85)
-for j, (xz, rd, sc) in enumerate([((-25.0, -24.0), 40, 1.0),
-                                  ((0.5, -25.5), 200, 0.9),
-                                  ((19.0, -26.5), 90, 1.05),
-                                  ((-24.0, 6.0), 10, 1.1),
-                                  ((24.0, 10.0), 180, 0.95),
-                                  ((-23.0, -8.0), 300, 1.0)]):
+place(n3, b(-27.5, 14.5), rot_deg=100, scale=0.85)
+for j, (xz, rd, sc) in enumerate([((-26.0, -20.0), 40, 1.0),
+                                  ((-25.5, -5.0), 200, 0.9),
+                                  ((-26.5, 8.5), 90, 1.05),
+                                  ((-25.0, 20.0), 10, 0.95),
+                                  ((8.0, -20.0), 180, 1.0),
+                                  ((22.0, -12.0), 300, 1.05),
+                                  ((23.0, 6.0), 60, 0.95),
+                                  ((10.0, 21.0), 250, 1.0)]):
     ot = linked_copy(tree, f'OutTree{j}')
     place(ot, b(*xz), rot_deg=rd, scale=sc)
-for j, (xz, rd, sc) in enumerate([((-20.0, -17.0), 0, 1.0),
-                                  ((14.0, -17.2), 120, 0.9),
-                                  ((25.0, -17.5), 70, 0.85)]):
+for j, (xz, rd, sc) in enumerate([((-16.9, -10.0), 0, 1.0),
+                                  ((-16.8, 8.0), 120, 0.9),
+                                  ((-16.9, 14.5), 70, 0.85),
+                                  ((20.0, 14.0), 30, 0.9)]):
     ob = linked_copy(bush, f'OutBush{j}')
     place(ob, b(*xz), rot_deg=rd, scale=sc)
 
@@ -361,7 +370,6 @@ for i, (xz, h, sc, rd) in enumerate(CLOUDS):
     cobj.rotation_euler = (0, 0, math.radians(rd))
     cobj.scale = (sc, sc, sc)
 
-# источник травы — под землю (движок инстансит и прячет)
 grass.location = (0, 0, -4)
 
 # ------------------------------------------------------------ экспорт
@@ -405,6 +413,6 @@ def shot(loc, look, path_):
     scene.render.filepath = path_
     bpy.ops.render.render(write_still=True)
 
-shot((0, -4, 52), (0, 0, 0), OUT_PREVIEW.replace('.png', '_top.png'))
-shot((2, -34, 20), (0, 4, 0.5), OUT_PREVIEW.replace('.png', '_persp.png'))
+shot((-4, -6, 56), (-4, 0, 0), OUT_PREVIEW.replace('.png', '_top.png'))
+shot((4, -34, 20), (-4, 4, 0.5), OUT_PREVIEW.replace('.png', '_persp.png'))
 print('[preview] done')

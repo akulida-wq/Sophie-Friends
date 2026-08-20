@@ -44,16 +44,16 @@ function buildLawnSquare(): THREE.Mesh {
     const x = pos.getX(i)
     const z = pos.getZ(i)
     const n = (Math.sin(x * 0.9 + z * 0.55) + Math.sin(x * 0.35 - z * 1.15) + 2) / 4
-    c.copy(light).lerp(deep, n)
+    const speck = Math.sin(x * 7.3 + z * 5.1) * Math.sin(x * 3.7 - z * 8.2) * 0.05
+    c.copy(light).lerp(deep, Math.min(1, Math.max(0, n + speck)))
     colors[i * 3] = c.r
     colors[i * 3 + 1] = c.g
     colors[i * 3 + 2] = c.b
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-  const mesh = new THREE.Mesh(
-    geo,
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }),
-  )
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 })
+  mat.envMapIntensity = 0.18 // газон не должен бликовать как пол
+  const mesh = new THREE.Mesh(geo, mat)
   mesh.name = 'ground'
   mesh.receiveShadow = true
   return mesh
@@ -78,10 +78,9 @@ function buildOuterGround(): THREE.Mesh {
     colors[i * 3 + 2] = c.b
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-  const mesh = new THREE.Mesh(
-    geo,
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.98 }),
-  )
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 })
+  mat.envMapIntensity = 0.18
+  const mesh = new THREE.Mesh(geo, mat)
   mesh.name = 'ground-outer'
   mesh.position.y = -0.03
   mesh.receiveShadow = true
@@ -123,7 +122,7 @@ function buildGrass(root: THREE.Group): void {
   srcNode.visible = false
   if (!src) return
   const tuft = src as THREE.Mesh
-  const COUNT = 3200
+  const COUNT = 5600
   const inst = new THREE.InstancedMesh(tuft.geometry, tuft.material, COUNT)
   // детерминированный PRNG: трава не «пересеивается» между кадрами/сессиями
   let seed = 20260820
@@ -133,27 +132,38 @@ function buildGrass(root: THREE.Group): void {
   }
   // не сажаем траву в дом, объекты и на плиточную дорожку
   const AVOID_C: [number, number, number][] = [
-    [-3.0, -11.6, 1.7], [4.4, -12.6, 2.0], [7.0, -9.6, 2.2],
-    [9.2, -3.2, 1.4], [7.2, -6.2, 1.3], [3.5, 1.5, 0.7],
-    [-4.5, -3.0, 1.0], [2.6, -5.2, 0.9],
+    [-3.0, -11.6, 1.7], [4.4, -12.6, 2.0], [7.4, -9.4, 2.2],
+    [6.2, 8.6, 1.4], [-8.6, -6.4, 1.3], [8.6, 5.4, 0.7],
+    [-9.4, -2.0, 1.0], [-5.6, 3.4, 0.9],
   ]
   const AVOID_R: [number, number, number, number][] = [
-    [-13.6, -6.0, -13.9, -7.0],   // дом (x0,x1,z0,z1)
-    [0.2, 2.6, -16.2, 8.4],       // дорожка от северных ворот
-    [-7.7, 2.6, -9.6, -7.6],      // ветка к крыльцу
+    [6.6, 13.8, -6.2, 0.2],       // дом справа (x0,x1,z0,z1)
+    [-16.2, 8.0, 0.2, 2.6],       // дорожка ворота(запад) -> дом
+    [0.2, 2.6, -13.6, 0.6],       // ветка на площадку
   ]
   const dummy = new THREE.Object3D()
   let placed = 0
   const HALF = 15.4
+  const OUT_COUNT = 1400 // редкая трава на внешней территории (кроме улицы)
   while (placed < COUNT) {
-    const x = (rand() * 2 - 1) * HALF
-    const z = (rand() * 2 - 1) * HALF
-    if (AVOID_C.some(([ax, az, ar]) => Math.hypot(x - ax, z - az) < ar)) continue
-    if (AVOID_R.some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1))
-      continue
+    const outer = placed >= COUNT - OUT_COUNT
+    let x: number
+    let z: number
+    if (outer) {
+      x = -14 + rand() * 46      // восточнее улицы: x in [-14, 32]
+      z = (rand() * 2 - 1) * 31
+      if (Math.abs(x) < 16.4 && Math.abs(z) < 16.4) continue // двор отдельно
+      if (Math.max(Math.abs(x), Math.abs(z)) > 31.5) continue
+    } else {
+      x = (rand() * 2 - 1) * HALF
+      z = (rand() * 2 - 1) * HALF
+      if (AVOID_C.some(([ax, az, ar]) => Math.hypot(x - ax, z - az) < ar)) continue
+      if (AVOID_R.some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1))
+        continue
+    }
     dummy.position.set(x, 0, z)
     dummy.rotation.y = rand() * Math.PI * 2
-    const s = 0.35 + rand() * 0.4
+    const s = 0.3 + rand() * 0.35
     dummy.scale.setScalar(s)
     dummy.updateMatrix()
     inst.setMatrixAt(placed++, dummy.matrix)
