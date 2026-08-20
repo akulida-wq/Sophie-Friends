@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { resolveYardCollisions } from '../core/Environment'
 import type { Game } from '../core/Game'
 
 export type AnimState = 'Idle' | 'Walk' | 'Run'
@@ -32,6 +33,9 @@ export class SophieController {
   tapInterceptor: ((raycaster: THREE.Raycaster) => boolean) | null = null
   /** Notified on Idle/Walk/Run changes (drives GLB clips once loaded). */
   onAnimChange: ((state: AnimState) => void) | null = null
+  /** Точка тапа по земле (риппл-индикатор). */
+  onMoveTarget: ((point: THREE.Vector3) => void) | null = null
+  private stuckTime = 0
 
   constructor(private readonly game: Game) {
     game.renderer.domElement.addEventListener('pointerdown', (e) => {
@@ -71,6 +75,8 @@ export class SophieController {
 
     this.target = hit.point.clone()
     this.target.y = 0
+    resolveYardCollisions(this.target) // цель не внутри препятствия
+    this.onMoveTarget?.(this.target)
   }
 
   update(dt: number): void {
@@ -94,6 +100,7 @@ export class SophieController {
     const running = distance > RUN_DISTANCE
     this.setAnim(running ? 'Run' : 'Walk')
     const speed = running ? RUN_SPEED : WALK_SPEED
+    const before = pos.clone()
 
     // Smooth turning: ease the yaw toward the direction of travel.
     const desiredYaw = Math.atan2(toTarget.x, toTarget.z)
@@ -105,6 +112,18 @@ export class SophieController {
 
     const step = Math.min(distance, speed * dt)
     pos.addScaledVector(toTarget.normalize(), step)
+    resolveYardCollisions(pos)
+    // упёрлись в препятствие — мягко останавливаемся, а не топчемся
+    if (pos.distanceTo(before) < step * 0.25) {
+      this.stuckTime += dt
+      if (this.stuckTime > 0.5) {
+        this.target = null
+        this.stuckTime = 0
+        this.setAnim('Idle')
+      }
+    } else {
+      this.stuckTime = 0
+    }
   }
 
   private setAnim(next: AnimState): void {

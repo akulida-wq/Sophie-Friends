@@ -17,6 +17,7 @@ import {
   createTree,
 } from './interaction/Placeholders'
 import { BrunoView } from './interaction/BrunoView'
+import { TapRipple } from './interaction/TapRipple'
 import { ChoicePanel } from './dialogue/ChoicePanel'
 import { SophieBubble } from './dialogue/SophieBubble'
 import { TapCue } from './dialogue/TapCue'
@@ -29,6 +30,7 @@ import { SafetyLayer } from './safety/SafetyLayer'
 import { StoryEngine } from './story/StoryEngine'
 import type { StoryMission } from './story/types'
 import brunoMission from './story/bruno.json'
+import propsContent from './story/props.json'
 
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
 const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=3'
@@ -54,6 +56,8 @@ const mood = new Mood(game.scene)
 const fireflies = new Fireflies(game.scene)
 mood.onTempChange = (temp) => fireflies.setActive(temp === 'warm')
 const rewardGlow = new RewardGlow(document.body)
+const tapRipple = new TapRipple(game.scene)
+controller.onMoveTarget = (p) => tapRipple.show(p)
 new PauseOverlay(document.body, game)
 new SoundToggle(document.body)
 
@@ -125,6 +129,9 @@ interaction.add({
 })
 
 // --- Мир: площадка из GLB; при неудаче — серый бокс-мир как раньше ---
+const PROP_LINES = (propsContent as { prop_lines: Record<string, { line: string }> })
+  .prop_lines
+
 const PLACEHOLDER_PROPS: Record<PropId, [() => THREE.Group, [number, number, number]]> = {
   ball: [createBall, [3.5, 0, 1.5]],
   blocks: [createBlocks, [-4, 0, -2.5]],
@@ -154,7 +161,13 @@ async function bootWorld(): Promise<void> {
         // облака не должны тонуть в тумане дальнего плана
         cl.traverse((ch) => {
           const mesh = ch as THREE.Mesh
-          if (mesh.isMesh) (mesh.material as THREE.Material & { fog?: boolean }).fog = false
+          if (mesh.isMesh) {
+            const m = mesh.material as THREE.MeshStandardMaterial
+            m.fog = false
+            // облако не должно сереть с теневой стороны
+            m.emissive = new THREE.Color(0xffffff)
+            m.emissiveIntensity = 0.42
+          }
         })
       }
     }
@@ -176,9 +189,28 @@ async function bootWorld(): Promise<void> {
       id,
       object,
       triggerRadius: 2.5,
-      onActivate: () => console.log(`[Interact] ${id} activated`),
+      onActivate: () => {
+        const prop = PROP_LINES[id]
+        if (prop && game.states.is('EXPLORE')) {
+          sophieView.play('Curious')
+          void bubble.say(prop.line, 3200)
+        }
+      },
     })
   }
+  // друзья — тоже интерактив с мягкой заглушкой
+  interaction.add({
+    id: 'friends',
+    object: friends,
+    triggerRadius: 2.5,
+    onActivate: () => {
+      const prop = PROP_LINES['friends']
+      if (prop && game.states.is('EXPLORE')) {
+        sophieView.play('Happy')
+        void bubble.say(prop.line, 3200)
+      }
+    },
+  })
 }
 
 void bootWorld()
@@ -211,6 +243,7 @@ game.addUpdatable(() => {
     namePlate.show(bruno, 'Bruno', { height: 2.75, autohideMs: 3500 })
   }
 })
+game.addUpdatable((dt) => tapRipple.update(dt))
 game.addUpdatable((dt) => safety.update(dt))
 
 game.start()

@@ -37,8 +37,8 @@ function buildLawnSquare(): THREE.Mesh {
   geo.rotateX(-Math.PI / 2)
   const pos = geo.attributes.position
   const colors = new Float32Array(pos.count * 3)
-  const light = new THREE.Color(0x93c483)
-  const deep = new THREE.Color(0x77ab68)
+  const light = new THREE.Color(0x8aba71)
+  const deep = new THREE.Color(0x6da05a)
   const c = new THREE.Color()
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i)
@@ -51,9 +51,11 @@ function buildLawnSquare(): THREE.Mesh {
     colors[i * 3 + 2] = c.b
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 })
-  mat.envMapIntensity = 0.18 // газон не должен бликовать как пол
-  const mesh = new THREE.Mesh(geo, mat)
+  // Lambert: IBL-окружение его не касается вовсе — матовый как настоящий газон
+  const mesh = new THREE.Mesh(
+    geo,
+    new THREE.MeshLambertMaterial({ vertexColors: true }),
+  )
   mesh.name = 'ground'
   mesh.receiveShadow = true
   return mesh
@@ -61,26 +63,30 @@ function buildLawnSquare(): THREE.Mesh {
 
 /** Территория за забором: суше и бледнее; НЕ 'ground' — туда не сходить. */
 function buildOuterGround(): THREE.Mesh {
-  const geo = new THREE.PlaneGeometry(66, 66, 32, 32)
+  // Тот же газон, но огромный — край уходит в туман цвета неба, поэтому
+  // переход земля -> небо плавный. НЕ 'ground' — ходить туда нельзя.
+  const geo = new THREE.PlaneGeometry(150, 150, 48, 48)
   geo.rotateX(-Math.PI / 2)
   const pos = geo.attributes.position
   const colors = new Float32Array(pos.count * 3)
-  const light = new THREE.Color(0x9dbd85)
-  const deep = new THREE.Color(0x88a973)
+  const light = new THREE.Color(0x8aba71)
+  const deep = new THREE.Color(0x6da05a)
   const c = new THREE.Color()
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i)
     const z = pos.getZ(i)
     const n = (Math.sin(x * 0.5 + z * 0.3) + Math.sin(x * 0.21 - z * 0.6) + 2) / 4
-    c.copy(light).lerp(deep, n)
+    const speck = Math.sin(x * 7.3 + z * 5.1) * Math.sin(x * 3.7 - z * 8.2) * 0.05
+    c.copy(light).lerp(deep, Math.min(1, Math.max(0, n + speck)))
     colors[i * 3] = c.r
     colors[i * 3 + 1] = c.g
     colors[i * 3 + 2] = c.b
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 })
-  mat.envMapIntensity = 0.18
-  const mesh = new THREE.Mesh(geo, mat)
+  const mesh = new THREE.Mesh(
+    geo,
+    new THREE.MeshLambertMaterial({ vertexColors: true }),
+  )
   mesh.name = 'ground-outer'
   mesh.position.y = -0.03
   mesh.receiveShadow = true
@@ -89,15 +95,18 @@ function buildOuterGround(): THREE.Mesh {
 
 /** Небо: купол с вертикальным градиентом (голубой -> кремовый горизонт). */
 function buildSkyDome(): THREE.Mesh {
-  const geo = new THREE.SphereGeometry(70, 32, 20)
+  const R = 155
+  const geo = new THREE.SphereGeometry(R, 48, 28)
   const pos = geo.attributes.position
   const colors = new Float32Array(pos.count * 3)
-  const top = new THREE.Color(0x8ecdf4)
-  const horizon = new THREE.Color(0xd9ecf6)
+  const top = new THREE.Color(0x6db8ea)
+  const mid = new THREE.Color(0x9fd3f2)
+  const horizon = new THREE.Color(0xdcecf4)
   const c = new THREE.Color()
   for (let i = 0; i < pos.count; i++) {
-    const t = Math.min(1, Math.max(0, pos.getY(i) / 70))
-    c.copy(horizon).lerp(top, Math.pow(t, 0.22))
+    const t = Math.min(1, Math.max(0, pos.getY(i) / R))
+    if (t < 0.3) c.copy(horizon).lerp(mid, Math.pow(t / 0.3, 0.7))
+    else c.copy(mid).lerp(top, Math.pow((t - 0.3) / 0.7, 0.9))
     colors[i * 3] = c.r
     colors[i * 3 + 1] = c.g
     colors[i * 3 + 2] = c.b
@@ -171,6 +180,51 @@ function buildGrass(root: THREE.Group): void {
   inst.receiveShadow = true
   inst.name = 'grass'
   root.add(inst)
+}
+
+/** Препятствия двора: Софи не проходит сквозь объекты и забор. */
+const YARD_BOUND = 15.2
+const COLL_CIRCLES: [number, number, number][] = [
+  [-3.0, -11.6, 1.5], [4.4, -12.6, 1.7], [7.4, -9.4, 1.9],
+  [6.2, 8.6, 1.1],
+  // стволы деревьев (крона не мешает)
+  [-8.6, -6.4, 0.6], [-13.6, -13.4, 0.6], [13.5, -13.6, 0.6],
+  [-12.6, 11.8, 0.6],
+  // кусты
+  [-6.2, -13.9, 0.8], [13.9, -7.2, 0.7], [-14.3, -2.0, 0.75],
+  [10.4, 13.6, 0.7], [14.2, 9.0, 0.75], [-8.8, 13.9, 0.7],
+  [0.6, 13.8, 0.7], [13.8, 1.4, 0.65],
+  // Бруно и друзья
+  [-3.0, -8.0, 0.9], [5.2, -8.6, 0.9],
+]
+const COLL_RECTS: [number, number, number, number][] = [
+  [6.9, 13.5, -5.9, -0.1], // дом
+]
+
+export function resolveYardCollisions(pos: THREE.Vector3): void {
+  pos.x = Math.min(YARD_BOUND, Math.max(-YARD_BOUND, pos.x))
+  pos.z = Math.min(YARD_BOUND, Math.max(-YARD_BOUND, pos.z))
+  for (const [cx, cz, r] of COLL_CIRCLES) {
+    const dx = pos.x - cx
+    const dz = pos.z - cz
+    const d = Math.hypot(dx, dz)
+    if (d < r && d > 1e-5) {
+      pos.x = cx + (dx / d) * r
+      pos.z = cz + (dz / d) * r
+    }
+  }
+  for (const [x0, x1, z0, z1] of COLL_RECTS) {
+    if (pos.x > x0 && pos.x < x1 && pos.z > z0 && pos.z < z1) {
+      const pushes: [number, number, number][] = [
+        [pos.x - x0, -1, 0], [x1 - pos.x, 1, 0],
+        [pos.z - z0, 0, -1], [z1 - pos.z, 0, 1],
+      ]
+      pushes.sort((a, b) => a[0] - b[0])
+      const [d, nx, nz] = pushes[0]
+      pos.x += nx * d
+      pos.z += nz * d
+    }
+  }
 }
 
 export async function loadEnvironment(url: string): Promise<LoadedEnvironment> {

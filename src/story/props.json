@@ -1,0 +1,24 @@
+{
+  "prop_lines": {
+    "ball": {
+      "line": "The friends are missing a ball for their game. Maybe we can bring it over later!",
+      "voice": "p_ball_missing"
+    },
+    "blocks": {
+      "line": "Building a tower together sounds fun. I bet Bruno would love to help!",
+      "voice": "p_blocks_bruno"
+    },
+    "chalk": {
+      "line": "We could draw something kind on the path for everyone to see.",
+      "voice": "p_chalk_draw"
+    },
+    "tree": {
+      "line": "A cozy shady spot. Perfect for a quiet little rest.",
+      "voice": "p_tree_rest"
+    },
+    "friends": {
+      "line": "They're setting up a game. Soon there will be room for everyone!",
+      "voice": "p_friends_game"
+    }
+  }
+}

@@ -8,9 +8,9 @@ import type { ColorTemp, MoodSpec } from '../story/types'
  */
 
 const TEMPS: Record<ColorTemp, { bg: number; sun: number; sky: number }> = {
-  cool: { bg: 0xe2e8ee, sun: 0xefe8dc, sky: 0xeef4fb },
-  neutral: { bg: 0xefe8d8, sun: 0xffe8c0, sky: 0xffffff },
-  warm: { bg: 0xf6e3c2, sun: 0xffd9a0, sky: 0xffeeda },
+  cool: { bg: 0xd3e3ee, sun: 0xefe8dc, sky: 0xeef4fb },
+  neutral: { bg: 0xdcecf4, sun: 0xffe8c0, sky: 0xffffff },
+  warm: { bg: 0xf0e2cf, sun: 0xffd9a0, sky: 0xffeeda },
 }
 
 const EASE = 0.8 // very slow drift — the shift should be felt, not seen
