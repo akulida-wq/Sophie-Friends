@@ -82,12 +82,18 @@ def clean_material(obj, tex_size=2048, roughness=None):
             img.scale(tex_size, tex_size)
 
 
-def decimate(obj, target_polys):
+def decimate(obj, target_polys, planar=False):
     n = len(obj.data.polygons)
     if n <= target_polys:
         return
     mod = obj.modifiers.new('dec', 'DECIMATE')
-    mod.ratio = target_polys / n
+    if planar:
+        # для плоских плит: коллапс рвёт поверхность в дыры, DISSOLVE
+        # сливает копланарные грани начисто
+        mod.decimate_type = 'DISSOLVE'
+        mod.angle_limit = math.radians(7)
+    else:
+        mod.ratio = target_polys / n
     dg = bpy.context.evaluated_depsgraph_get()
     newmesh = bpy.data.meshes.new_from_object(obj.evaluated_get(dg))
     obj.modifiers.remove(mod)
@@ -114,7 +120,8 @@ def normalize(obj, height=None, width=None):
     obj.data.transform(Matrix.Scale(s, 4))
 
 
-def load_asset(fname, name, height=None, width=None, polys=8000, tex=1024):
+def load_asset(fname, name, height=None, width=None, polys=8000, tex=1024,
+               planar=False):
     pre = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=os.path.join(SRC_DIR, fname))
     new = [o for o in bpy.data.objects if o not in pre]
@@ -126,7 +133,7 @@ def load_asset(fname, name, height=None, width=None, polys=8000, tex=1024):
     keep.name = name
     keep.data.name = name
     clean_material(keep, tex_size=tex)
-    decimate(keep, polys)
+    decimate(keep, polys, planar=planar)
     normalize(keep, height=height, width=width)
     return keep
 
@@ -212,7 +219,7 @@ ball = load_asset(F['ball'], 'Ball', height=0.55, polys=6000, tex=512)
 blocks = load_asset(F['blocks'], 'Blocks', width=1.1, polys=9000, tex=1024)
 chalk = load_asset(F['chalk'], 'Chalk', width=0.55, polys=6000, tex=512)
 gate = load_asset(F['gate'], 'Gate', width=4.7, polys=10000, tex=1024)
-pave = load_asset(F['pave'], 'PaveTile', width=0.98, polys=900, tex=512)
+pave = load_asset(F['pave'], 'PaveTile', width=0.98, polys=3000, tex=512, planar=True)
 # плитка должна лишь чуть выступать: плющим по высоте и топим в газон
 _pz = [v.co.z for v in pave.data.vertices]
 _ph = max(_pz) - min(_pz)

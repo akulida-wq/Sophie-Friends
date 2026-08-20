@@ -33,9 +33,9 @@ import brunoMission from './story/bruno.json'
 import propsContent from './story/props.json'
 
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
-const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=3'
+const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=4'
 const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=5'
-const ASSET_ENV = '/assets/environment2.glb?v=11'
+const ASSET_ENV = '/assets/environment2.glb?v=12'
 
 const container = document.getElementById('app')
 if (!container) throw new Error('Missing #app container')

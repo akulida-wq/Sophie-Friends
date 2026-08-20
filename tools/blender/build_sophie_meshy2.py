@@ -283,6 +283,27 @@ def tail_wag(f0, f1, period=8, amp=0.45):
 L = S  # масштаб для location-амплитуд (рост модели)
 
 
+def strip_hips_location(act):
+    removed = 0
+    target = 'pose.bones["Hips"].location'
+    try:
+        for fc in list(act.fcurves):
+            if fc.data_path == target:
+                act.fcurves.remove(fc)
+                removed += 1
+        return removed
+    except AttributeError:
+        pass
+    for layer in act.layers:
+        for strip in layer.strips:
+            for cb in strip.channelbags:
+                for fc in list(cb.fcurves):
+                    if fc.data_path == target:
+                        cb.fcurves.remove(fc)
+                        removed += 1
+    return removed
+
+
 def strip_scale_curves(act):
     """Blender 5: кривые в channelbags слоёв. Убираем scale-треки."""
     removed = 0
@@ -311,6 +332,8 @@ for clip, scale in (('Walk', 1.0), ('Run', 0.55)):
     act = walk_src.copy()
     act.name = f'S2_{clip}'
     print(f'[scale-strip] {clip}:', strip_scale_curves(act), 'curves removed')
+    # вертикаль таза из цикла Meshy утапливает собаку в землю
+    print(f'[hips-strip] {clip}:', strip_hips_location(act), 'curves removed')
     act.use_fake_user = True
     track = arm.animation_data.nla_tracks.new()
     track.name = clip
