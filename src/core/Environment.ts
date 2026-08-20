@@ -48,8 +48,8 @@ function buildLawnIsland(): THREE.Mesh {
     }
   }
   const colors = new Float32Array(pos.count * 3)
-  const light = new THREE.Color(0x9ccb8b)
-  const deep = new THREE.Color(0x83b975)
+  const light = new THREE.Color(0x93c483)
+  const deep = new THREE.Color(0x77ab68)
   const c = new THREE.Color()
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i)
@@ -94,6 +94,50 @@ function buildSkyDome(): THREE.Mesh {
   return mesh
 }
 
+/** Трава: InstancedMesh из узла GrassTuft (v2), рассыпанная по острову. */
+function buildGrass(root: THREE.Group): void {
+  const srcNode = root.getObjectByName('GrassTuft')
+  if (!srcNode) return
+  let src: THREE.Mesh | null = null
+  srcNode.traverse((ch) => {
+    if (!src && (ch as THREE.Mesh).isMesh) src = ch as THREE.Mesh
+  })
+  srcNode.visible = false
+  if (!src) return
+  const tuft = src as THREE.Mesh
+  const COUNT = 850
+  const inst = new THREE.InstancedMesh(tuft.geometry, tuft.material, COUNT)
+  // детерминированный PRNG: трава не «пересеивается» между кадрами/сессиями
+  let seed = 20260820
+  const rand = () => {
+    seed = (seed * 16807) % 2147483647
+    return seed / 2147483647
+  }
+  // не сажаем траву внутри крупных объектов
+  const AVOID: [number, number, number][] = [
+    [-7.6, -7.9, 2.6], [-1.7, -10.2, 1.6], [2.7, -11.2, 1.8],
+    [5.4, -8.2, 2.0], [8.0, -3.0, 1.4], [6.4, -5.4, 1.2],
+  ]
+  const dummy = new THREE.Object3D()
+  let placed = 0
+  while (placed < COUNT) {
+    const r = Math.sqrt(rand()) * 12.4
+    const a = rand() * Math.PI * 2
+    const x = Math.cos(a) * r
+    const z = Math.sin(a) * r
+    if (AVOID.some(([ax, az, ar]) => Math.hypot(x - ax, z - az) < ar)) continue
+    dummy.position.set(x, 0, z)
+    dummy.rotation.y = rand() * Math.PI * 2
+    const s = 0.45 + rand() * 0.75
+    dummy.scale.setScalar(s)
+    dummy.updateMatrix()
+    inst.setMatrixAt(placed++, dummy.matrix)
+  }
+  inst.receiveShadow = true
+  inst.name = 'grass'
+  root.add(inst)
+}
+
 export async function loadEnvironment(url: string): Promise<LoadedEnvironment> {
   const gltf = await new GLTFLoader().loadAsync(url)
   const root = gltf.scene
@@ -105,23 +149,25 @@ export async function loadEnvironment(url: string): Promise<LoadedEnvironment> {
     }
   })
 
-  // Плоскую GLB-землю прячем, вместо неё — скруглённый остров-газон.
+  // Плоская GLB-земля (только в старом environment.glb) прячется,
+  // вместо неё — скруглённый остров-газон.
   const flatGround = root.getObjectByName('Ground')
-  if (!flatGround) throw new Error('environment.glb has no Ground mesh')
-  flatGround.visible = false
-  flatGround.name = 'ground-flat'
+  if (flatGround) {
+    flatGround.visible = false
+    flatGround.name = 'ground-flat'
+    // Композиция старого набора: полукруглой сценой, а не в линию.
+    for (const [nodeName, [dx, dz]] of Object.entries(LAYOUT_SHIFT)) {
+      const node = root.getObjectByName(nodeName)
+      if (node) {
+        node.position.x += dx
+        node.position.z += dz
+      }
+    }
+  }
   const ground = buildLawnIsland()
   root.add(ground)
   root.add(buildSkyDome())
-
-  // Композиция: площадка полукруглой сценой, а не в линию.
-  for (const [nodeName, [dx, dz]] of Object.entries(LAYOUT_SHIFT)) {
-    const node = root.getObjectByName(nodeName)
-    if (node) {
-      node.position.x += dx
-      node.position.z += dz
-    }
-  }
+  buildGrass(root)
 
   const props: Partial<Record<PropId, THREE.Object3D>> = {}
   for (const [id, nodeName] of Object.entries(PROP_NODES) as [PropId, string][]) {

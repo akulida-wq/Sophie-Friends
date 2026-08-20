@@ -33,7 +33,7 @@ import brunoMission from './story/bruno.json'
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
 const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=3'
 const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=5'
-const ASSET_ENV = '/assets/environment.glb?v=1'
+const ASSET_ENV = '/assets/environment2.glb?v=1'
 
 const container = document.getElementById('app')
 if (!container) throw new Error('Missing #app container')
@@ -133,6 +133,7 @@ const PLACEHOLDER_PROPS: Record<PropId, [() => THREE.Group, [number, number, num
 }
 
 const swayNodes: THREE.Object3D[] = []
+const cloudNodes: THREE.Object3D[] = []
 
 async function bootWorld(): Promise<void> {
   let props: Partial<Record<PropId, THREE.Object3D>> = {}
@@ -141,9 +142,14 @@ async function bootWorld(): Promise<void> {
     game.scene.getObjectByName('ground')?.removeFromParent() // серый пол долой
     game.scene.add(env.root)
     props = env.props
-    for (const name of ['TreeDeco1', 'TreeDeco2', 'Tree', 'Bushes']) {
+    for (const name of ['TreeDeco1', 'TreeDeco2', 'TreeDeco3', 'Tree',
+                        'Bushes']) {
       const node = env.root.getObjectByName(name)
       if (node) swayNodes.push(node)
+    }
+    for (let i = 1; i <= 4; i++) {
+      const cl = env.root.getObjectByName(`Cloud${i}`)
+      if (cl) cloudNodes.push(cl)
     }
   } catch (err) {
     console.warn('[Environment] failed — falling back to grey box world', err)
@@ -178,10 +184,15 @@ game.addUpdatable((dt) => cinematicCamera.update(dt))
 game.addUpdatable((dt) => brunoView.update(dt))
 game.addUpdatable((dt) => mood.update(dt))
 game.addUpdatable((dt, elapsed) => fireflies.update(dt, elapsed))
-game.addUpdatable((_dt, elapsed) => {
+game.addUpdatable((dt, elapsed) => {
   // еле заметное покачивание зелени — медленный sin, не мигание
   swayNodes.forEach((n, i) => {
     n.rotation.z = Math.sin(elapsed * 0.4 + i * 1.7) * 0.012
+  })
+  // облака: очень медленный дрейф с заворотом по кругу
+  cloudNodes.forEach((n, i) => {
+    n.position.x += dt * (0.12 + i * 0.03)
+    if (n.position.x > 26) n.position.x = -26
   })
 })
 game.addUpdatable(() => tapCue.update())
