@@ -398,7 +398,9 @@ export class StoryEngine {
       if (action.line) {
         console.log(`[Cinematic] ${action.actor ?? 'voice'}: "${action.line}"`)
         audio.voice(action.voice)
-        this.deps.bubble.say(action.line).then(step)
+        this.deps.bubble
+          .say(action.line, undefined, action.actor === 'bruno' ? 'bruno' : 'sophie')
+          .then(step)
         return
       }
       if (action.mood) {

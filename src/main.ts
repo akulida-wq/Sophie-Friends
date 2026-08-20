@@ -35,7 +35,7 @@ import propsContent from './story/props.json'
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
 const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=3'
 const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=5'
-const ASSET_ENV = '/assets/environment2.glb?v=10'
+const ASSET_ENV = '/assets/environment2.glb?v=11'
 
 const container = document.getElementById('app')
 if (!container) throw new Error('Missing #app container')
@@ -193,7 +193,7 @@ async function bootWorld(): Promise<void> {
         const prop = PROP_LINES[id]
         if (prop && game.states.is('EXPLORE')) {
           sophieView.play('Curious')
-          void bubble.say(prop.line, 3200)
+          void bubble.say(prop.line)
         }
       },
     })
@@ -207,7 +207,7 @@ async function bootWorld(): Promise<void> {
       const prop = PROP_LINES['friends']
       if (prop && game.states.is('EXPLORE')) {
         sophieView.play('Happy')
-        void bubble.say(prop.line, 3200)
+        void bubble.say(prop.line)
       }
     },
   })

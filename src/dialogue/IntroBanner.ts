@@ -10,7 +10,10 @@ export class IntroBanner {
     this.el.className = 'intro-banner'
     const avatar = document.createElement('span')
     avatar.className = 'sophie-avatar'
-    avatar.textContent = '🐶'
+    const img = document.createElement('img')
+    img.src = '/ui/portrait_sophie.png'
+    img.alt = ''
+    avatar.appendChild(img)
     const text = document.createElement('span')
     text.className = 'intro-banner__text'
     text.textContent = "Someone looks lonely today. Let's go say hi!"

@@ -210,9 +210,14 @@ daisy = load_asset(F['daisy'], 'Daisy0', height=0.55, polys=9000, tex=512)
 cloud = load_asset(F['cloud'], 'Cloud1', width=4.5, polys=5000, tex=256)
 ball = load_asset(F['ball'], 'Ball', height=0.55, polys=6000, tex=512)
 blocks = load_asset(F['blocks'], 'Blocks', width=1.1, polys=9000, tex=1024)
-chalk = load_asset(F['chalk'], 'Chalk', width=0.9, polys=6000, tex=512)
-gate = load_asset(F['gate'], 'Gate', width=3.4, polys=10000, tex=1024)
+chalk = load_asset(F['chalk'], 'Chalk', width=0.55, polys=6000, tex=512)
+gate = load_asset(F['gate'], 'Gate', width=4.7, polys=10000, tex=1024)
 pave = load_asset(F['pave'], 'PaveTile', width=0.98, polys=900, tex=512)
+# плитка должна лишь чуть выступать: плющим по высоте и топим в газон
+_pz = [v.co.z for v in pave.data.vertices]
+_ph = max(_pz) - min(_pz)
+pave.data.transform(Matrix.Scale(0.07 / _ph, 4, Vector((0, 0, 1))))
+pave.data.transform(Matrix.Translation((0, 0, -0.018)))
 
 # ------------------------------------------------------- двор: композиция
 # Дом СПРАВА, крыльцом на запад (в сторону двора и улицы).
@@ -228,7 +233,7 @@ place(bench, b(6.2, 8.6), rot_deg=-115)
 place(ball, b(8.6, 5.4), rot_deg=20)           # юго-восток
 place(blocks, b(-9.4, -2.0), rot_deg=25)       # запад
 place(chalk, b(-5.6, 3.4), rot_deg=-40)        # у дорожки, юго-запад
-place(gate, b(-15.8, 1.5), rot_deg=-90)        # калитка в проёме ворот
+place(gate, b(-15.8, 2.28), rot_deg=-90)       # калитка перекрывает проём
 
 place(tree, b(-8.6, -6.4), rot_deg=30)         # интерактивное дерево, СЗ
 t1 = linked_copy(tree, 'TreeDeco1')
