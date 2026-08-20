@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
-const OFFSET = new THREE.Vector3(0, 8, 10) // above and slightly behind (Sims-like)
-const LOOK_AHEAD = new THREE.Vector3(0, 0.6, 0)
+const OFFSET = new THREE.Vector3(0, 7, 11.5) // above and slightly behind (Sims-like)
+const LOOK_AHEAD = new THREE.Vector3(0, 1.6, 0) // повыше: в кадре полоса неба
 const POSITION_DAMP = 3.0 // higher = tighter follow
 const LOOK_DAMP = 4.0
 const FOCUS_OFFSET = new THREE.Vector3(0, 3.2, 4.6) // closer view for CHOICE

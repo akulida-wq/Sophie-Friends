@@ -33,7 +33,7 @@ import brunoMission from './story/bruno.json'
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
 const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=3'
 const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=5'
-const ASSET_ENV = '/assets/environment2.glb?v=4'
+const ASSET_ENV = '/assets/environment2.glb?v=9'
 
 const container = document.getElementById('app')
 if (!container) throw new Error('Missing #app container')
@@ -149,7 +149,14 @@ async function bootWorld(): Promise<void> {
     }
     for (let i = 1; i <= 4; i++) {
       const cl = env.root.getObjectByName(`Cloud${i}`)
-      if (cl) cloudNodes.push(cl)
+      if (cl) {
+        cloudNodes.push(cl)
+        // облака не должны тонуть в тумане дальнего плана
+        cl.traverse((ch) => {
+          const mesh = ch as THREE.Mesh
+          if (mesh.isMesh) (mesh.material as THREE.Material & { fog?: boolean }).fog = false
+        })
+      }
     }
   } catch (err) {
     console.warn('[Environment] failed — falling back to grey box world', err)
@@ -191,8 +198,8 @@ game.addUpdatable((dt, elapsed) => {
   })
   // облака: очень медленный дрейф с заворотом по кругу
   cloudNodes.forEach((n, i) => {
-    n.position.x += dt * (0.12 + i * 0.03)
-    if (n.position.x > 26) n.position.x = -26
+    n.position.x += dt * (0.25 + i * 0.08)
+    if (n.position.x > 42) n.position.x = -42
   })
 })
 game.addUpdatable(() => tapCue.update())

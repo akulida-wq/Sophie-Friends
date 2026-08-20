@@ -92,12 +92,12 @@ function buildSkyDome(): THREE.Mesh {
   const geo = new THREE.SphereGeometry(70, 32, 20)
   const pos = geo.attributes.position
   const colors = new Float32Array(pos.count * 3)
-  const top = new THREE.Color(0xb9ddf3)
-  const horizon = new THREE.Color(0xf6ecd8)
+  const top = new THREE.Color(0x8ecdf4)
+  const horizon = new THREE.Color(0xd9ecf6)
   const c = new THREE.Color()
   for (let i = 0; i < pos.count; i++) {
     const t = Math.min(1, Math.max(0, pos.getY(i) / 70))
-    c.copy(horizon).lerp(top, Math.pow(t, 0.65))
+    c.copy(horizon).lerp(top, Math.pow(t, 0.22))
     colors[i * 3] = c.r
     colors[i * 3 + 1] = c.g
     colors[i * 3 + 2] = c.b
