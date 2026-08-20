@@ -7,7 +7,7 @@ import * as THREE from 'three'
 export function createWorld(scene: THREE.Scene): void {
   // Gentle sky — soft blue, slightly warm fog so distance fades calmly.
   scene.background = new THREE.Color(0xcfe8f5)
-  scene.fog = new THREE.Fog(0xefe8d8, 26, 60)
+  scene.fog = new THREE.Fog(0xefe8d8, 34, 90)
 
   // Ground plane — muted warm green, like a quiet courtyard lawn.
   const ground = new THREE.Mesh(

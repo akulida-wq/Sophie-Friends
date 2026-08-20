@@ -33,7 +33,7 @@ import brunoMission from './story/bruno.json'
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
 const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=3'
 const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=5'
-const ASSET_ENV = '/assets/environment2.glb?v=1'
+const ASSET_ENV = '/assets/environment2.glb?v=3'
 
 const container = document.getElementById('app')
 if (!container) throw new Error('Missing #app container')
@@ -80,7 +80,7 @@ let namePlateShown = false
 
 // --- Фоновые друзья (по спеку остаются заглушками), у песочницы ---
 const friends = createFriends()
-friends.position.set(1.8, 0, -9.2)
+friends.position.set(5.2, 0, -8.6)
 game.scene.add(friends)
 
 // --- Story: mission JSON drives everything after this point ---

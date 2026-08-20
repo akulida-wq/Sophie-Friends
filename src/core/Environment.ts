@@ -30,23 +30,12 @@ const LAYOUT_SHIFT: Record<string, [number, number]> = {
   TreeDeco2: [0.5, 2.5],
 }
 
-/** Газон-остров: скруглённый диск с мягкой двухтоновой вариацией травы. */
-function buildLawnIsland(): THREE.Mesh {
-  // Плотная сетка, спроецированная в диск: без радиальных полос веера.
-  const R = 13.5
-  const geo = new THREE.PlaneGeometry(R * 2, R * 2, 72, 72)
+/** Двор: кликабельный квадратный газон (raycast ходьбы идёт по 'ground'). */
+function buildLawnSquare(): THREE.Mesh {
+  const HALF = 16.6
+  const geo = new THREE.PlaneGeometry(HALF * 2, HALF * 2, 64, 64)
   geo.rotateX(-Math.PI / 2)
   const pos = geo.attributes.position
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i)
-    const z = pos.getZ(i)
-    const r = Math.hypot(x, z)
-    if (r > R) {
-      const k = R / r
-      pos.setX(i, x * k)
-      pos.setZ(i, z * k)
-    }
-  }
   const colors = new Float32Array(pos.count * 3)
   const light = new THREE.Color(0x93c483)
   const deep = new THREE.Color(0x77ab68)
@@ -66,6 +55,35 @@ function buildLawnIsland(): THREE.Mesh {
     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }),
   )
   mesh.name = 'ground'
+  mesh.receiveShadow = true
+  return mesh
+}
+
+/** Территория за забором: суше и бледнее; НЕ 'ground' — туда не сходить. */
+function buildOuterGround(): THREE.Mesh {
+  const geo = new THREE.PlaneGeometry(66, 66, 32, 32)
+  geo.rotateX(-Math.PI / 2)
+  const pos = geo.attributes.position
+  const colors = new Float32Array(pos.count * 3)
+  const light = new THREE.Color(0x9dbd85)
+  const deep = new THREE.Color(0x88a973)
+  const c = new THREE.Color()
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i)
+    const z = pos.getZ(i)
+    const n = (Math.sin(x * 0.5 + z * 0.3) + Math.sin(x * 0.21 - z * 0.6) + 2) / 4
+    c.copy(light).lerp(deep, n)
+    colors[i * 3] = c.r
+    colors[i * 3 + 1] = c.g
+    colors[i * 3 + 2] = c.b
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  const mesh = new THREE.Mesh(
+    geo,
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.98 }),
+  )
+  mesh.name = 'ground-outer'
+  mesh.position.y = -0.03
   mesh.receiveShadow = true
   return mesh
 }
@@ -105,7 +123,7 @@ function buildGrass(root: THREE.Group): void {
   srcNode.visible = false
   if (!src) return
   const tuft = src as THREE.Mesh
-  const COUNT = 850
+  const COUNT = 3200
   const inst = new THREE.InstancedMesh(tuft.geometry, tuft.material, COUNT)
   // детерминированный PRNG: трава не «пересеивается» между кадрами/сессиями
   let seed = 20260820
@@ -113,22 +131,29 @@ function buildGrass(root: THREE.Group): void {
     seed = (seed * 16807) % 2147483647
     return seed / 2147483647
   }
-  // не сажаем траву внутри крупных объектов
-  const AVOID: [number, number, number][] = [
-    [-7.6, -7.9, 2.6], [-1.7, -10.2, 1.6], [2.7, -11.2, 1.8],
-    [5.4, -8.2, 2.0], [8.0, -3.0, 1.4], [6.4, -5.4, 1.2],
+  // не сажаем траву в дом, объекты и на плиточную дорожку
+  const AVOID_C: [number, number, number][] = [
+    [-3.0, -11.6, 1.7], [4.4, -12.6, 2.0], [7.0, -9.6, 2.2],
+    [9.2, -3.2, 1.4], [7.2, -6.2, 1.3], [3.5, 1.5, 0.7],
+    [-4.5, -3.0, 1.0], [2.6, -5.2, 0.9],
+  ]
+  const AVOID_R: [number, number, number, number][] = [
+    [-13.6, -6.0, -13.9, -7.0],   // дом (x0,x1,z0,z1)
+    [0.2, 2.6, -16.2, 8.4],       // дорожка от северных ворот
+    [-7.7, 2.6, -9.6, -7.6],      // ветка к крыльцу
   ]
   const dummy = new THREE.Object3D()
   let placed = 0
+  const HALF = 15.4
   while (placed < COUNT) {
-    const r = Math.sqrt(rand()) * 12.4
-    const a = rand() * Math.PI * 2
-    const x = Math.cos(a) * r
-    const z = Math.sin(a) * r
-    if (AVOID.some(([ax, az, ar]) => Math.hypot(x - ax, z - az) < ar)) continue
+    const x = (rand() * 2 - 1) * HALF
+    const z = (rand() * 2 - 1) * HALF
+    if (AVOID_C.some(([ax, az, ar]) => Math.hypot(x - ax, z - az) < ar)) continue
+    if (AVOID_R.some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1))
+      continue
     dummy.position.set(x, 0, z)
     dummy.rotation.y = rand() * Math.PI * 2
-    const s = 0.45 + rand() * 0.75
+    const s = 0.35 + rand() * 0.4
     dummy.scale.setScalar(s)
     dummy.updateMatrix()
     inst.setMatrixAt(placed++, dummy.matrix)
@@ -164,8 +189,8 @@ export async function loadEnvironment(url: string): Promise<LoadedEnvironment> {
       }
     }
   }
-  const ground = buildLawnIsland()
-  root.add(ground)
+  root.add(buildLawnSquare())
+  root.add(buildOuterGround())
   root.add(buildSkyDome())
   buildGrass(root)
 
