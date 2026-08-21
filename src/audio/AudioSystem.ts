@@ -257,9 +257,27 @@ class AudioSystem {
     }
   }
 
-  /** Озвучка реплики; текстовый пузырь — всегда рядом как фолбэк. */
+  private currentVoice: HTMLAudioElement | null = null
+  private voiceStartedAt = 0
+  private readonly missingSfx = new Set<string>()
+
+  /** Реплика ещё звучит? Клики по пропсам ждут её конца (не накладываемся).
+   *  Страховка: зависший плейбек (фон/битый файл) не должен запереть
+   *  интерактив — старше 12с реплика считается законченной. */
+  get isVoicePlaying(): boolean {
+    const el = this.currentVoice
+    if (!el || el.paused || el.ended) return false
+    return performance.now() - this.voiceStartedAt < 12_000
+  }
+
+  /** Озвучка реплики; текстовый пузырь — всегда рядом как фолбэк.
+   *  Новая реплика мягко снимает предыдущую (сюжет не ждёт хвостов). */
   voice(id: string | undefined): void {
     if (!id || this.muted || this.missingVoices.has(id)) return
+    if (this.currentVoice) {
+      this.currentVoice.pause()
+      this.currentVoice = null
+    }
     const el = new Audio(`/assets/voice/${id}.mp3`)
     el.volume = VOICE_VOLUME
     el.onerror = () => {
@@ -268,9 +286,22 @@ class AudioSystem {
         console.warn(`[Voice] нет файла для "${id}" — только текстовый пузырь`)
       }
     }
+    this.currentVoice = el
+    this.voiceStartedAt = performance.now()
     el.play().catch(() => {
       /* до первого жеста браузер может отклонить — это ок */
     })
+  }
+
+  /** Мягкий звуковой эффект из /assets/sfx/<name>.mp3; нет файла — тишина. */
+  sfx(name: string, volume = 0.5): void {
+    if (this.muted || this.missingSfx.has(name)) return
+    const el = new Audio(`/assets/sfx/${name}.mp3`)
+    el.volume = volume
+    el.onerror = () => {
+      this.missingSfx.add(name)
+    }
+    el.play().catch(() => {})
   }
 }
 

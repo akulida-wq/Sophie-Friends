@@ -11,7 +11,7 @@ export class IntroBanner {
     const avatar = document.createElement('span')
     avatar.className = 'sophie-avatar'
     const img = document.createElement('img')
-    img.src = '/ui/portrait_sophie.png'
+    img.src = '/ui/portrait_sophie.png?v=2'
     img.alt = ''
     avatar.appendChild(img)
     const text = document.createElement('span')

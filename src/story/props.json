@@ -27,6 +27,10 @@
     "fountain": {
       "line": "Ahh, fresh and cool! A little water break makes everything better.",
       "voice": "p_fountain_drink"
+    },
+    "fountain_full": {
+      "line": "Mm, I'm all refreshed already! Let's play some more — I'll have another sip a bit later.",
+      "voice": "p_fountain_full"
     }
   },
   "locked": {

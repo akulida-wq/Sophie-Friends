@@ -23,6 +23,8 @@ export interface StoryAction {
   move?: string
   prop?: string
   props?: string[]
+  /** Вариант реплики по предмету, выбранному в минигре (ball/blocks/chalk). */
+  line_variants?: Record<string, { line: string; voice?: string }>
   mood?: MoodSpec
   reward?: { type?: string; style?: string; note?: string }
   highlight?: string

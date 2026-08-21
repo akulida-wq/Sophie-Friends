@@ -66,6 +66,8 @@ export class StoryEngine {
   /** Per-scene count of gentle redirects (drives simplify_after_misses). */
   private missCounts = new Map<string, number>()
   private minigameTimer: number | null = null
+  /** Каким предметом ребёнок сыграл в минигре — от него зависят реплики. */
+  private lastMinigameProp: string | null = null
   /** Called when a choice is picked; SafetyLayer listens for avoidance. */
   onChoice: ((choiceId: string, redirect: boolean, avoidant: boolean) => void) | null = null
 
@@ -108,6 +110,7 @@ export class StoryEngine {
   private beginRun(): void {
     this.invalidatePending()
     this.missCounts.clear()
+    this.lastMinigameProp = null
     const initialState = this.mission.actors?.bruno?.initial_state ?? 'withdrawn'
     this.deps.brunoView.setState(initialState)
     console.log(`[Story] mission "${this.mission.mission}" started`)
@@ -301,6 +304,7 @@ export class StoryEngine {
       if (!propIds.includes(id)) return false
       const option = scene.mechanics.options.find((o) => MINIGAME_PROP[o.id] === id)
       console.log(`[Minigame] cooperative action: ${option?.id ?? id}`)
+      this.lastMinigameProp = id
       this.deps.interaction.overrideActivate = null
       if (this.minigameTimer !== null) {
         window.clearTimeout(this.minigameTimer)
@@ -377,6 +381,7 @@ export class StoryEngine {
         return this.restart()
       case 'to_hub_stub':
         // Soft "coming soon" — warm words, no locks, no error styling.
+        audio.voice('s8_sophie_hub_soon')
         this.deps.bubble
           .say('Another friend is getting ready to meet you. We can visit them soon. 🌿')
           .then(reshowMenu)
@@ -409,10 +414,13 @@ export class StoryEngine {
         return
       }
       if (action.line) {
-        console.log(`[Cinematic] ${action.actor ?? 'voice'}: "${action.line}"`)
-        audio.voice(action.voice)
+        // фраза может зависеть от предмета минигры (мяч/кубики/мелки)
+        const variant =
+          (this.lastMinigameProp && action.line_variants?.[this.lastMinigameProp]) || action
+        console.log(`[Cinematic] ${action.actor ?? 'voice'}: "${variant.line}"`)
+        audio.voice(variant.voice)
         this.deps.bubble
-          .say(action.line, undefined, action.actor === 'bruno' ? 'bruno' : 'sophie')
+          .say(variant.line ?? action.line, undefined, action.actor === 'bruno' ? 'bruno' : 'sophie')
           .then(step)
         return
       }
@@ -444,6 +452,12 @@ export class StoryEngine {
         return
       }
       if (action.anim) {
+        // проп-анимация чужого предмета (мяч укатился, а играли мелками) — мимо
+        if (!action.actor && action.prop && this.lastMinigameProp &&
+            action.prop !== this.lastMinigameProp) {
+          step()
+          return
+        }
         const actorId = action.actor ?? action.prop ?? 'stage'
         const played = action.actor
           ? this.deps.playActorAnim?.(action.actor, action.anim) === true

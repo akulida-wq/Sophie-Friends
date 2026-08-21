@@ -19,7 +19,7 @@ const ICONS: Record<string, string> = {
   tree: `img:${DIR}/tree.svg`,
   retry: `img:${DIR}/retry.svg`,
   replay: `img:${DIR}/retry.svg`,
-  sophie: 'img:/ui/portrait_sophie.png',
+  sophie: 'img:/ui/portrait_sophie.png?v=2',
   away: `img:${DIR}/away.svg`,
   friends: `img:${DIR}/friends.svg`,
   leaf: `img:${DIR}/leaf.svg`,

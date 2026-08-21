@@ -44,6 +44,15 @@
 - p_gate_street_teaser — Beyond this gate there's a whole street to explore! Let's help our friends in the yard first — then we'll go for a walk together.
 - p_locked_bruno_first — Let's say hi to Bruno first — he looks like he could use a friend.
 - p_fountain_drink — Ahh, fresh and cool! A little water break makes everything better.
+- p_fountain_full — Mm, I'm all refreshed already! Let's play some more — I'll have another sip a bit later.
 
 ## СОФИ — финальное меню (опционально)
 - s8_sophie_hub_soon — Another friend is getting ready to meet you. We can visit them soon.
+
+## СОФИ — «вобл» после минигры (вариант под выбранный предмет)
+(s6_sophie_wobble_intro про мяч уже записан — эти два добивают кубики и мелки)
+- s6_sophie_wobble_blocks — Oops — the tower gave a little wobble. That's okay, wobbles happen! What should Bruno try?
+- s6_sophie_wobble_chalk — Oops — the chalk line went a bit squiggly. That's okay, wobbles happen! What should Bruno try?
+
+## ЕЩЁ НЕ ЗАПИСАНО (сводка)
+- p_fountain_drink, p_fountain_full, s6_sophie_wobble_blocks, s6_sophie_wobble_chalk

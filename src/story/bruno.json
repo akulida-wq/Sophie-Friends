@@ -278,8 +278,8 @@
       "actions": [
         {
           "actor": "bruno",
-          "anim": "SitAlone",
-          "note": "feels no better"
+          "anim": "IdleSad",
+          "note": "stays standing, feels no better (no sit — looked off)"
         },
         {
           "actor": "sophie",
@@ -390,8 +390,22 @@
       "intro_actions": [
         {
           "actor": "sophie",
-          "line": "Oops — the ball rolled a little off. That's okay, wobbles happen! What should Bruno try?",
-          "voice": "s6_sophie_wobble_intro"
+          "line": "Oops — a little wobble! That's okay, wobbles happen. What should Bruno try?",
+          "voice": "s6_sophie_wobble_any",
+          "line_variants": {
+            "ball": {
+              "line": "Oops — the ball rolled a little off. That's okay, wobbles happen! What should Bruno try?",
+              "voice": "s6_sophie_wobble_intro"
+            },
+            "blocks": {
+              "line": "Oops — the tower gave a little wobble. That's okay, wobbles happen! What should Bruno try?",
+              "voice": "s6_sophie_wobble_blocks"
+            },
+            "chalk": {
+              "line": "Oops — the chalk line went a bit squiggly. That's okay, wobbles happen! What should Bruno try?",
+              "voice": "s6_sophie_wobble_chalk"
+            }
+          }
         },
         {
           "actor": "bruno",

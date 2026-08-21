@@ -1,8 +1,8 @@
 export type Speaker = 'sophie' | 'bruno'
 
 const PORTRAITS: Record<Speaker, string> = {
-  sophie: '/ui/portrait_sophie.png',
-  bruno: '/ui/portrait_bruno.png',
+  sophie: '/ui/portrait_sophie.png?v=2',
+  bruno: '/ui/portrait_bruno.png?v=2',
 }
 
 /**

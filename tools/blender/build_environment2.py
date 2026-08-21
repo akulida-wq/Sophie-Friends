@@ -353,7 +353,7 @@ place(house, b(10.2, -3.0), rot_deg=-82)
 place(slide, b(-3.0, -11.6), rot_deg=15)
 place(swing, b(4.4, -12.6), rot_deg=4)
 place(sandbox, b(7.4, -9.4), rot_deg=-12)
-place(bench, b(6.2, 8.6), rot_deg=-115)
+place(bench, b(6.2, 8.6), rot_deg=-90)  # ровно вдоль дорожки к лавке
 place(fountain, b(-5.5, 9.6), rot_deg=15)
 
 # интерактив по всей территории
@@ -364,17 +364,17 @@ place(gate, b(-15.8, 2.28), rot_deg=-90)       # калитка перекрыв
 
 place(tree, b(-8.6, -6.4), rot_deg=30)         # интерактивное дерево, СЗ
 t1 = linked_copy(tree, 'TreeDeco1')
-place(t1, b(-13.6, -13.4), rot_deg=140, scale=0.92)
+place(t1, b(-12.8, -12.8), rot_deg=140, scale=0.92)
 t2 = linked_copy(tree, 'TreeDeco2')
-place(t2, b(13.5, -13.6), rot_deg=260, scale=1.08)
+place(t2, b(12.9, -12.9), rot_deg=260, scale=1.08)
 t3 = linked_copy(tree, 'TreeDeco3')
 place(t3, b(-12.6, 11.8), rot_deg=80, scale=0.85)
 
 bushes_parent = bpy.data.objects.new('Bushes', None)
 scene.collection.objects.link(bushes_parent)
-BUSH_SPOTS = [((-6.2, -13.9), 0, 1.0), ((13.9, -7.2), 70, 0.85),
-              ((-14.3, -2.0), 30, 0.9), ((10.4, 13.6), 160, 0.8),
-              ((14.2, 9.0), 200, 0.9), ((-8.8, 13.9), 300, 0.85),
+BUSH_SPOTS = [((-6.2, -15.1), 0, 1.0), ((13.9, -7.2), 70, 0.85),
+              ((-15.1, -2.0), 30, 0.9), ((10.4, 13.6), 160, 0.8),
+              ((13.3, 9.0), 200, 0.9), ((-8.8, 13.9), 300, 0.85),
               ((0.6, 13.8), 260, 0.8), ((12.4, 4.8), 120, 0.75)]
 for i, (xz, rd, sc) in enumerate(BUSH_SPOTS):
     bobj = bush if i == 0 else linked_copy(bush, f'Bush{i}')
@@ -388,6 +388,47 @@ DAISY_SPOTS = [((4.0, -4.2), 15, 1.0), ((-11.8, -9.2), 120, 0.85),
 for i, (xz, rd, sc) in enumerate(DAISY_SPOTS):
     dobj = daisy if i == 0 else linked_copy(daisy, f'Daisy{i}')
     place(dobj, b(*xz), rot_deg=rd, scale=sc)
+
+# ------------------------------------------------ клумба (юг, у дорожки)
+def tinted_daisy(name, tint):
+    d = daisy.data.copy()
+    obj = bpy.data.objects.new(name, d)
+    scene.collection.objects.link(obj)
+    for i, m in enumerate(list(d.materials)):
+        mc = m.copy()
+        nt = mc.node_tree
+        pr = next(n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED')
+        base = pr.inputs['Base Color']
+        if base.links:
+            src_sock = base.links[0].from_socket
+            mix = nt.nodes.new('ShaderNodeMix')
+            mix.data_type = 'RGBA'
+            mix.blend_type = 'MULTIPLY'
+            mix.inputs[0].default_value = 1.0
+            nt.links.new(src_sock, mix.inputs[6])       # A: родная текстура
+            mix.inputs[7].default_value = (*tint, 1.0)  # B: тон клумбы
+            nt.links.new(mix.outputs[2], base)
+        else:
+            c = base.default_value
+            base.default_value = (c[0]*tint[0], c[1]*tint[1], c[2]*tint[2], 1.0)
+        d.materials[i] = mc
+    return obj
+
+daisy_pink = tinted_daisy('FlowerPink', (1.0, 0.55, 0.72))
+daisy_blue = tinted_daisy('FlowerBlue', (0.6, 0.68, 1.0))
+BED_SPOTS = [((-1.7, 11.2), 15, 0.75, 'p'), ((-1.0, 12.0), 130, 0.6, 'b'),
+             ((-0.3, 11.1), 240, 0.7, 'w'), ((0.4, 12.1), 60, 0.75, 'p'),
+             ((1.1, 11.3), 300, 0.6, 'b'), ((1.8, 11.9), 180, 0.7, 'p'),
+             ((-1.4, 12.6), 90, 0.6, 'b'), ((0.1, 12.8), 210, 0.7, 'w'),
+             ((1.5, 12.6), 330, 0.65, 'b'), ((-0.6, 13.0), 45, 0.6, 'p'),
+             ((0.9, 10.8), 155, 0.6, 'w'), ((-2.1, 12.2), 275, 0.65, 'p'),
+             ((2.2, 11.4), 20, 0.6, 'b')]
+for i, (xz, rd, sc, ck) in enumerate(BED_SPOTS):
+    src = {'p': daisy_pink, 'b': daisy_blue, 'w': daisy}.get(ck, daisy)
+    fobj = linked_copy(src, f'Flower{i}')
+    place(fobj, b(*xz), rot_deg=rd, scale=sc)
+for proto in (daisy_pink, daisy_blue):
+    bpy.data.objects.remove(proto, do_unlink=True)  # данные живут в копиях
 
 # --------------------------------------------------- забор по периметру
 SEG = 2.28
@@ -456,7 +497,14 @@ add_run(range(5, 14), (-7,))
 add_run((5,), range(-7, 0))
 # южные ветки: к фонтану и к лавке
 add_run((-6,), range(2, 9))
-add_run((5,), range(2, 7))
+add_run((5,), range(2, 9))
+# поперечная: от фонтана до лавки
+add_run(range(-6, 6), (8,))
+# периметр вдоль забора — двор оплетён прямоугольником
+add_run(range(-14, 14), (-14,))
+add_run(range(-14, 14), (13,))
+add_run((-14,), range(-14, 14))
+add_run((13,), range(-14, 14))
 
 path_tf = []
 for (kx, kz) in sorted(cells):

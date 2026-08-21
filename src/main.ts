@@ -40,7 +40,7 @@ import memoryMission from './story/memory.json'
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
 const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=5'
 const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=5'
-const ASSET_ENV = '/assets/environment2.glb?v=18'
+const ASSET_ENV = '/assets/environment2.glb?v=19'
 
 const container = document.getElementById('app')
 if (!container) throw new Error('Missing #app container')
@@ -123,13 +123,14 @@ let namePlateShown = false
 // расписанию (раз в минуту, по очереди: жёлтый танцует, красный боксирует)
 const friends = new THREE.Group()
 friends.name = 'friends'
-friends.position.set(5.2, 0, -8.6)
+friends.position.set(4.6, 0, -8.6)
 game.scene.add(friends)
 
+// полукруг, раскрытый к камере (юг): все трое видны, чуть повёрнуты к центру
 const FRIEND_SPECS = [
-  { id: 'yellow', url: '/assets/friend_yellow.glb?v=1', offset: [-0.95, 0.55], yaw: 2.4, height: 2.0 },
-  { id: 'pink', url: '/assets/friend_pink.glb?v=1', offset: [0.55, 1.55], yaw: 3.6, height: 1.8 },
-  { id: 'red', url: '/assets/friend_red.glb?v=1', offset: [1.35, -0.75], yaw: 4.4, height: 2.05 },
+  { id: 'yellow', url: '/assets/friend_yellow.glb?v=1', offset: [-1.15, 0.15], yaw: 0.35, height: 2.0 },
+  { id: 'pink', url: '/assets/friend_pink.glb?v=1', offset: [0.0, 0.75], yaw: 0, height: 1.8 },
+  { id: 'red', url: '/assets/friend_red.glb?v=1', offset: [1.15, 0.1], yaw: -0.35, height: 2.05 },
 ] as const
 const friendViews: FriendView[] = []
 const friendLoads: Promise<boolean>[] = []
@@ -239,6 +240,8 @@ const PROP_LINES = PROPS_CONTENT.prop_lines
 
 function propActivated(id: string): void {
   if (!game.states.is('EXPLORE')) return
+  // пока звучит предыдущая реплика — повторный тап молча ждёт её конца
+  if (audio.isVoicePlaying) return
   if (!brunoMet) {
     // подсказываем первый шаг и подсвечиваем Бруно
     sophieView.play('Curious')
@@ -338,7 +341,7 @@ async function bootWorld(): Promise<void> {
       object: gateNode,
       triggerRadius: 2.6,
       onActivate: () => {
-        if (!game.states.is('EXPLORE')) return
+        if (!game.states.is('EXPLORE') || audio.isVoicePlaying) return
         const prop = PROP_LINES['gate']
         if (prop) {
           sophieView.play('Curious')
@@ -348,7 +351,9 @@ async function bootWorld(): Promise<void> {
       },
     })
   }
-  // фонтан: Софи подходит и пьёт воду
+  // фонтан: Софи подходит и пьёт воду (повторно — не раньше чем через 2 мин)
+  const DRINK_COOLDOWN_MS = 120_000
+  let lastDrinkAt = -DRINK_COOLDOWN_MS
   const fountainInteractNode = game.scene.getObjectByName('Fountain')
   if (fountainInteractNode) {
     interaction.add({
@@ -356,17 +361,29 @@ async function bootWorld(): Promise<void> {
       object: fountainInteractNode,
       triggerRadius: 2.9,
       onActivate: () => {
-        if (!game.states.is('EXPLORE')) return
+        if (!game.states.is('EXPLORE') || audio.isVoicePlaying) return
         // мордой к воде
         const fp = new THREE.Vector3()
         fountainInteractNode.getWorldPosition(fp)
         const sp = game.sophie.position
         game.sophie.rotation.y = Math.atan2(fp.x - sp.x, fp.z - sp.z)
-        // «пьёт»: нос к воде (Sniff), потом довольное виляние
+        // жажда утолена надолго: повторный тап — мягкий отказ без анимации питья
+        if (performance.now() - lastDrinkAt < DRINK_COOLDOWN_MS) {
+          sophieView.play('Happy')
+          const prop = PROP_LINES['fountain_full']
+          if (prop) {
+            audio.voice(prop.voice)
+            void bubble.say(prop.line)
+          }
+          return
+        }
+        lastDrinkAt = performance.now()
+        // «пьёт»: нос к воде (Sniff) + журчание, потом довольное виляние
         sophieView.play('Sniff')
+        audio.sfx('drink', 0.45)
         window.setTimeout(() => {
-          if (!controller.isMoving && game.states.is('EXPLORE')) {
-            sophieView.play('TailWag')
+          if (game.states.is('EXPLORE')) {
+            if (!controller.isMoving) sophieView.play('TailWag')
             const prop = PROP_LINES['fountain']
             if (prop) {
               audio.voice(prop.voice)
