@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { Game } from './core/Game'
 import { Mood } from './core/Mood'
 import { Fireflies } from './core/Fireflies'
+import { FountainWater } from './core/FountainWater'
 import { loadEnvironment, type PropId } from './core/Environment'
 import { SophieController } from './player/SophieController'
 import { SophieView } from './player/SophieView'
@@ -38,7 +39,7 @@ import memoryMission from './story/memory.json'
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
 const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=5'
 const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=5'
-const ASSET_ENV = '/assets/environment2.glb?v=17'
+const ASSET_ENV = '/assets/environment2.glb?v=18'
 
 const container = document.getElementById('app')
 if (!container) throw new Error('Missing #app container')
@@ -234,6 +235,7 @@ const PLACEHOLDER_PROPS: Record<PropId, [() => THREE.Group, [number, number, num
 
 const swayNodes: { node: THREE.Object3D; amp: number }[] = []
 const cloudNodes: THREE.Object3D[] = []
+let fountainWater: FountainWater | null = null
 
 async function bootWorld(): Promise<void> {
   let props: Partial<Record<PropId, THREE.Object3D>> = {}
@@ -249,6 +251,9 @@ async function bootWorld(): Promise<void> {
     // кусты качаются каждый вокруг СВОЕЙ базы (группой их «подбрасывало»)
     const bushes = env.root.getObjectByName('Bushes')
     bushes?.children.forEach((bush) => swayNodes.push({ node: bush, amp: 0.005 }))
+    // живая вода фонтана
+    const fountainNode = env.root.getObjectByName('Fountain')
+    if (fountainNode) fountainWater = new FountainWater(game.scene, fountainNode)
     for (let i = 1; i <= 4; i++) {
       const cl = env.root.getObjectByName(`Cloud${i}`)
       if (cl) {
@@ -337,6 +342,7 @@ game.addUpdatable((dt) => cinematicCamera.update(dt))
 game.addUpdatable((dt) => brunoView.update(dt))
 game.addUpdatable((dt) => mood.update(dt))
 game.addUpdatable((dt, elapsed) => fireflies.update(dt, elapsed))
+game.addUpdatable((dt, elapsed) => fountainWater?.update(dt, elapsed))
 game.addUpdatable((dt, elapsed) => {
   // еле заметное покачивание зелени — медленный sin, не мигание
   swayNodes.forEach(({ node, amp }, i) => {

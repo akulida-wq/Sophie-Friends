@@ -144,6 +144,7 @@ function buildGrass(root: THREE.Group): void {
     [-3.0, -11.6, 1.7], [4.4, -12.6, 2.0], [7.4, -9.4, 2.2],
     [6.2, 8.6, 1.4], [-8.6, -6.4, 1.3], [8.6, 5.4, 0.7],
     [-9.4, -2.0, 1.0], [-5.6, 3.4, 0.9],
+    [-5.5, 9.6, 1.9], // фонтан
   ]
   const AVOID_R: [number, number, number, number][] = [
     [6.6, 13.8, -6.2, 0.2], // дом справа (x0,x1,z0,z1)
@@ -166,6 +167,8 @@ function buildGrass(root: THREE.Group): void {
   addRun([13], range(-7, 0))         // кольцо: восток
   addRun(range(5, 14), [-7])         // кольцо: север
   addRun([5], range(-7, 0))          // кольцо: запад (крыльцо)
+  addRun([-6], range(2, 9))          // южная ветка: к фонтану
+  addRun([5], range(2, 7))           // южная ветка: к лавке
   const onTile = (x: number, z: number): boolean => {
     const kx = Math.round((x - G0) / P)
     const kz = Math.round((z - G0) / P)
@@ -221,6 +224,8 @@ const COLL_CIRCLES: [number, number, number][] = [
   [0.6, 13.8, 0.7], [13.8, 1.4, 0.65],
   // Бруно и друзья
   [-3.0, -8.0, 0.9], [5.2, -8.6, 0.9],
+  // фонтан
+  [-5.5, 9.6, 1.5],
 ]
 const COLL_RECTS: [number, number, number, number][] = [
   [6.9, 13.5, -5.9, -0.1], // дом

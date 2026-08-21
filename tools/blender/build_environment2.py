@@ -244,6 +244,7 @@ F = {
     'chalk': 'chalk_sticks.glb',
     'gate': 'gate.glb',
     'pave': 'pave_tile.glb',
+    'fountain': 'fountain.glb',
 }
 
 # бюджеты подняты: видимой потери качества быть не должно
@@ -259,6 +260,7 @@ grass = load_asset(F['grass'], 'GrassTuft', height=0.26, polys=220, tex=512)
 daisy = load_asset(F['daisy'], 'Daisy0', height=0.55, polys=9000, tex=512)
 cloud = load_asset(F['cloud'], 'Cloud1', width=4.5, polys=5000, tex=256)
 ball = load_asset(F['ball'], 'Ball', height=0.55, polys=6000, tex=512)
+fountain = load_asset(F['fountain'], 'Fountain', height=1.8, polys=22000, tex=1024)
 blocks = load_asset(F['blocks'], 'Blocks', width=1.1, polys=9000, tex=1024)
 chalk = load_asset(F['chalk'], 'Chalk', width=0.55, polys=16000, tex=512)
 gate = load_asset(F['gate'], 'Gate', width=4.7, polys=10000, tex=1024)
@@ -352,6 +354,7 @@ place(slide, b(-3.0, -11.6), rot_deg=15)
 place(swing, b(4.4, -12.6), rot_deg=4)
 place(sandbox, b(7.4, -9.4), rot_deg=-12)
 place(bench, b(6.2, 8.6), rot_deg=-115)
+place(fountain, b(-5.5, 9.6), rot_deg=15)
 
 # интерактив по всей территории
 place(ball, b(8.6, 5.4), rot_deg=20)           # юго-восток
@@ -451,6 +454,9 @@ add_run((0, 1), range(-13, 0))
 add_run((13,), range(-7, 0))
 add_run(range(5, 14), (-7,))
 add_run((5,), range(-7, 0))
+# южные ветки: к фонтану и к лавке
+add_run((-6,), range(2, 9))
+add_run((5,), range(2, 7))
 
 path_tf = []
 for (kx, kz) in sorted(cells):
