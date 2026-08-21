@@ -1,10 +1,9 @@
 /**
  * Звук мока. Safety-правила прежде всего: ничего резкого и громкого.
  *
- * - Музыка: «музыкальная шкатулка» — мягкие колокольчики, мажорная
- *   пентатоника, спокойный темп; между нотами — тишина (никаких
- *   непрерывных падов). Настроения (calm / warm / warm_lift) подмешивают
- *   второй голос медленными рампами.
+ * - Музыка: трек /audio/music.mp3 лупом через WebAudio; настроение
+ *   (calm / warm / warm_lift) плавно меняет громкость. Если файла нет —
+ *   фолбэк на процедурную «музыкальную шкатулку».
  * - UI-звуки: короткие мягкие блипы с плавной атакой.
  * - Озвучка: /assets/voice/{line_id}.mp3; нет файла — текстовый пузырь.
  *
@@ -48,6 +47,8 @@ class AudioSystem {
   private schedulerId: number | null = null
   private nextNoteTime = 0
   private step = 0
+  private musicGain: GainNode | null = null
+  private musicLoaded = false
 
   constructor() {
     this.muted = localStorage.getItem(MUTE_KEY) === '1'
@@ -104,7 +105,7 @@ class AudioSystem {
     if (!this.started) {
       this.started = true
       this.buildAmbient()
-      this.startScheduler()
+      void this.startMusicFile()
       this.setMood(this.pendingMood)
     }
     this.applyState()
@@ -122,6 +123,33 @@ class AudioSystem {
     this.harmonyGain = ctx.createGain()
     this.harmonyGain.gain.value = 0
     this.harmonyGain.connect(this.master)
+  }
+
+  /** Фоновый трек лупом. Громкость ведёт setMood. */
+  private async startMusicFile(): Promise<void> {
+    const ctx = this.ctx
+    if (!ctx || !this.master) return
+    try {
+      const res = await fetch('/audio/music.mp3')
+      if (!res.ok) throw new Error(String(res.status))
+      const buf = await ctx.decodeAudioData(await res.arrayBuffer())
+      this.musicGain = ctx.createGain()
+      this.musicGain.gain.value = 0
+      this.musicGain.connect(this.master)
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.loop = true
+      src.connect(this.musicGain)
+      src.start()
+      this.musicLoaded = true
+      // плавное появление
+      const t = ctx.currentTime
+      this.musicGain.gain.linearRampToValueAtTime(0.55, t + 3)
+      console.log('[Audio] music.mp3 looping')
+    } catch {
+      console.log('[Audio] no music.mp3 — falling back to music box')
+      this.startScheduler()
+    }
   }
 
   /** Колокольчик «музыкальной шкатулки»: синус + тихая октава, быстрый
@@ -170,13 +198,21 @@ class AudioSystem {
   setMood(music: string): void {
     this.pendingMood = (music as MoodMusic) ?? 'ambient_calm'
     const ctx = this.ctx
-    if (!ctx || !this.harmonyGain) return
+    if (!ctx) return
     const t = ctx.currentTime
     const ramp = (g: GainNode, v: number) => {
       g.gain.cancelScheduledValues(t)
       g.gain.setValueAtTime(g.gain.value, t)
       g.gain.linearRampToValueAtTime(v, t + 4)
     }
+    if (this.musicLoaded && this.musicGain) {
+      // трек: тише в спокойных сценах, теплее и полнее к финалу
+      if (music === 'ambient_warm_lift') ramp(this.musicGain, 0.8)
+      else if (music === 'ambient_warm') ramp(this.musicGain, 0.68)
+      else ramp(this.musicGain, 0.55)
+      return
+    }
+    if (!this.harmonyGain) return
     if (music === 'ambient_warm_lift') ramp(this.harmonyGain, 0.9)
     else if (music === 'ambient_warm') ramp(this.harmonyGain, 0.6)
     else ramp(this.harmonyGain, 0)
