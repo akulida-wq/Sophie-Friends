@@ -14,10 +14,10 @@ import {
   createBlocks,
   createBruno,
   createChalk,
-  createFriends,
   createTree,
 } from './interaction/Placeholders'
 import { BrunoView } from './interaction/BrunoView'
+import { FriendView } from './interaction/FriendView'
 import { TapRipple } from './interaction/TapRipple'
 import { VideoOverlay } from './dialogue/VideoOverlay'
 import { ExitButton } from './safety/ExitButton'
@@ -118,10 +118,33 @@ brunoMarker.show(bruno, 'img:/ui/icons/talk.svg', { height: 3.1 })
 introBanner.show()
 let namePlateShown = false
 
-// --- Фоновые друзья (по спеку остаются заглушками), у песочницы ---
-const friends = createFriends()
+// --- Друзья-монстрики у песочницы: Idle + изредка Look/Chat, трюки по
+// расписанию (раз в минуту, по очереди: жёлтый танцует, красный боксирует)
+const friends = new THREE.Group()
+friends.name = 'friends'
 friends.position.set(5.2, 0, -8.6)
 game.scene.add(friends)
+
+const FRIEND_SPECS = [
+  { id: 'yellow', url: '/assets/friend_yellow.glb?v=1', offset: [-0.95, 0.55], yaw: 2.4, height: 2.0 },
+  { id: 'pink', url: '/assets/friend_pink.glb?v=1', offset: [0.25, 1.35], yaw: 3.4, height: 1.8 },
+  { id: 'red', url: '/assets/friend_red.glb?v=1', offset: [1.05, -0.6], yaw: 4.4, height: 2.05 },
+] as const
+const friendViews: FriendView[] = []
+for (const spec of FRIEND_SPECS) {
+  const anchor = new THREE.Group()
+  anchor.name = `friend-${spec.id}`
+  anchor.position.set(spec.offset[0], 0, spec.offset[1])
+  friends.add(anchor)
+  const view = new FriendView(anchor, spec.height)
+  void view.load(spec.url, spec.yaw)
+  friendViews.push(view)
+}
+// живость: каждый изредка озирается/болтает (вразнобой)
+let friendFidgetAt = 14
+// трюки: раз в минуту, по очереди (0 = жёлтый танец, 2 = красный бокс)
+let trickAt = 25
+let trickTurn = 0
 
 // --- Story: mission JSON drives everything after this point ---
 const story = new StoryEngine(
@@ -372,6 +395,22 @@ game.addUpdatable((dt) => brunoView.update(dt))
 game.addUpdatable((dt) => mood.update(dt))
 game.addUpdatable((dt, elapsed) => fireflies.update(dt, elapsed))
 game.addUpdatable((dt, elapsed) => fountainWater?.update(dt, elapsed))
+game.addUpdatable((dt) => friendViews.forEach((f) => f.update(dt)))
+game.addUpdatable((_dt, elapsed) => {
+  if (elapsed >= friendFidgetAt) {
+    // случайный друг коротко оживает — Look или Chat
+    const f = friendViews[Math.floor(elapsed * 7.13) % friendViews.length]
+    f.playOnce(Math.floor(elapsed * 3.7) % 2 === 0 ? 'Look' : 'Chat')
+    friendFidgetAt = elapsed + 9 + (elapsed * 5.3) % 8
+  }
+  if (elapsed >= trickAt) {
+    // показ раз в минуту, строго по очереди: жёлтый -> красный -> жёлтый...
+    const performer = trickTurn % 2 === 0 ? friendViews[0] : friendViews[2]
+    if (performer?.hasClip('Trick')) performer.playOnce('Trick')
+    trickTurn++
+    trickAt = elapsed + 60
+  }
+})
 game.addUpdatable((dt, elapsed) => {
   // еле заметное покачивание зелени — медленный sin, не мигание
   swayNodes.forEach(({ node, amp }, i) => {

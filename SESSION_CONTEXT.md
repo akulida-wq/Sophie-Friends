@@ -133,9 +133,12 @@ change NOTHING, [LEFT/RIGHT/BACK] view» в одном чате. Друзья: �
 rigged + pretty.
 
 ## Статус / хвосты
-- Ждём от Артура: 3 друзей-монстриков (пары rigged+pretty),
-  public/video/memory1.mp4, голос p_fountain_drink.
-- Друзья пока цветные капсулы у песочницы (спека это разрешала).
+- Друзья ГОТОВЫ: friend_{yellow,pink,red}.glb (build_friends.py из
+  «Friends (riggs + animation)/*_merged.glb»), клипы Idle/Look/Chat(+Trick
+  у yellow=танец, red=бокс). FriendView + main: фиджеты раз в 9-17с,
+  трюки раз в 60с по очереди (жёлтый→красный). Портреты
+  public/ui/portrait_{yellow,red,pink}.png (круглые, для будущих плашек).
+- Ждём от Артура: public/video/memory1.mp4, голос p_fountain_drink.
 - Дальше по плану Артура: интерфейс, логика, камера (после визуала).
 - Старые ассеты сохранены (sophie.glb, sophie_meshy.glb, bruno.glb,
   environment.glb) — откат = смена ASSET_* в main.ts.
