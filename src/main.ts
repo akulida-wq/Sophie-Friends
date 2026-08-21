@@ -30,6 +30,7 @@ import { RewardGlow } from './dialogue/RewardGlow'
 import { PauseOverlay } from './safety/PauseOverlay'
 import { SoundToggle } from './safety/SoundToggle'
 import { SafetyLayer } from './safety/SafetyLayer'
+import { audio } from './audio/AudioSystem'
 import { StoryEngine } from './story/StoryEngine'
 import type { StoryMission } from './story/types'
 import brunoMission from './story/bruno.json'
@@ -127,19 +128,22 @@ game.scene.add(friends)
 
 const FRIEND_SPECS = [
   { id: 'yellow', url: '/assets/friend_yellow.glb?v=1', offset: [-0.95, 0.55], yaw: 2.4, height: 2.0 },
-  { id: 'pink', url: '/assets/friend_pink.glb?v=1', offset: [0.25, 1.35], yaw: 3.4, height: 1.8 },
-  { id: 'red', url: '/assets/friend_red.glb?v=1', offset: [1.05, -0.6], yaw: 4.4, height: 2.05 },
+  { id: 'pink', url: '/assets/friend_pink.glb?v=1', offset: [0.55, 1.55], yaw: 3.6, height: 1.8 },
+  { id: 'red', url: '/assets/friend_red.glb?v=1', offset: [1.35, -0.75], yaw: 4.4, height: 2.05 },
 ] as const
 const friendViews: FriendView[] = []
+const friendLoads: Promise<boolean>[] = []
 for (const spec of FRIEND_SPECS) {
   const anchor = new THREE.Group()
   anchor.name = `friend-${spec.id}`
   anchor.position.set(spec.offset[0], 0, spec.offset[1])
   friends.add(anchor)
   const view = new FriendView(anchor, spec.height)
-  void view.load(spec.url, spec.yaw)
+  friendLoads.push(view.load(spec.url, spec.yaw))
   friendViews.push(view)
 }
+// свечение интерактива должно светить настоящие модели, не пустую группу
+void Promise.all(friendLoads).then(() => interaction.invalidate('friends'))
 // живость: каждый изредка озирается/болтает (вразнобой)
 let friendFidgetAt = 14
 // трюки: раз в минуту, по очереди (0 = жёлтый танец, 2 = красный бокс)
@@ -228,8 +232,8 @@ interaction.add({
 
 // --- Мир: площадка из GLB; при неудаче — серый бокс-мир как раньше ---
 const PROPS_CONTENT = propsContent as {
-  prop_lines: Record<string, { line: string }>
-  locked: { line: string }
+  prop_lines: Record<string, { line: string; voice?: string }>
+  locked: { line: string; voice?: string }
 }
 const PROP_LINES = PROPS_CONTENT.prop_lines
 
@@ -238,6 +242,7 @@ function propActivated(id: string): void {
   if (!brunoMet) {
     // подсказываем первый шаг и подсвечиваем Бруно
     sophieView.play('Curious')
+    audio.voice(PROPS_CONTENT.locked.voice)
     void bubble.say(PROPS_CONTENT.locked.line)
     brunoMarker.show(bruno, 'img:/ui/icons/talk.svg', { height: 3.1, autohideMs: 4000 })
     return
@@ -245,6 +250,7 @@ function propActivated(id: string): void {
   const prop = PROP_LINES[id]
   if (prop) {
     sophieView.play(id === 'friends' ? 'Happy' : 'Curious')
+    audio.voice(prop.voice)
     void bubble.say(prop.line)
   }
 }
@@ -336,6 +342,7 @@ async function bootWorld(): Promise<void> {
         const prop = PROP_LINES['gate']
         if (prop) {
           sophieView.play('Curious')
+          audio.voice(prop.voice)
           void bubble.say(prop.line)
         }
       },
@@ -361,7 +368,10 @@ async function bootWorld(): Promise<void> {
           if (!controller.isMoving && game.states.is('EXPLORE')) {
             sophieView.play('TailWag')
             const prop = PROP_LINES['fountain']
-            if (prop) void bubble.say(prop.line)
+            if (prop) {
+              audio.voice(prop.voice)
+              void bubble.say(prop.line)
+            }
           }
         }, 2600)
         window.setTimeout(() => {

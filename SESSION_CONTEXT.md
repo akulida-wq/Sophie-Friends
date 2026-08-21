@@ -20,9 +20,11 @@ CLAUDE.md — жёсткие правила (safety, контент только
   подключаю в движок. После КАЖДОГО блока — git commit + короткое резюме.
 - Кэш ассетов сбрасывается версией в main.ts: `ASSET_* = '...glb?v=N'` —
   бампить при каждой пересборке GLB.
-- Проверка: браузер-пейн (скрытая вкладка ТРОТТЛИТ rAF и таймеры —
-  движение медленное, туда телепортирую `window.game.sophie.position.set`,
-  активирую `window.sophieDebug.interaction.activate(id)`).
+- Проверка: браузер-пейн (СКРЫТАЯ вкладка/пейн ЗАМОРАЖИВАЕТ rAF —
+  игровой цикл стоит, cinematic-твины «висят» вечно: это НЕ баг игры,
+  а артефакт замера! Перед плейтестом tabs_select и убедиться, что пейн
+  реально виден; телепорт `window.game.sophie.position.set`,
+  активация `window.sophieDebug.interaction.activate(id)`).
 
 ## Ассеты и скрипты (tools/blender/)
 - `build_sophie_meshy2.py` → public/assets/sophie_meshy2.glb —
