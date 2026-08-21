@@ -36,7 +36,7 @@ import propsContent from './story/props.json'
 import memoryMission from './story/memory.json'
 
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
-const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=4'
+const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=5'
 const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=5'
 const ASSET_ENV = '/assets/environment2.glb?v=17'
 
@@ -66,15 +66,36 @@ new PauseOverlay(document.body, game)
 new SoundToggle(document.body)
 
 controller.tapInterceptor = (raycaster) => interaction.tryActivate(raycaster)
+// Точка «напротив Бруно»: подходим к его лицу, с какой бы стороны ни шли
+function brunoFrontPoint(): THREE.Vector3 {
+  const p = new THREE.Vector3()
+  bruno.getWorldPosition(p)
+  p.y = 0
+  const dir = new THREE.Vector3(Math.sin(bruno.rotation.y), 0, Math.cos(bruno.rotation.y))
+  return p.addScaledVector(dir, 1.7)
+}
+
 controller.findFarTap = (rc) => {
   const item = interaction.findTapped(rc)
   if (!item) return null
+  if (item.id === 'bruno') {
+    return { id: 'bruno', point: brunoFrontPoint(), radius: 0.2 }
+  }
   const point = new THREE.Vector3()
   item.object.getWorldPosition(point)
   point.y = 0
   return { id: item.id, point, radius: item.triggerRadius }
 }
-controller.onArrivedAtInteract = (id) => interaction.activate(id)
+controller.onArrivedAtInteract = (id) => {
+  if (id === 'bruno') {
+    // повернуться лицом к Бруно перед разговором
+    const bp = new THREE.Vector3()
+    bruno.getWorldPosition(bp)
+    const s = game.sophie.position
+    game.sophie.rotation.y = Math.atan2(bp.x - s.x, bp.z - s.z)
+  }
+  interaction.activate(id)
+}
 
 // --- Бруно: якорь-группа сразу (плейсхолдер), GLB подменяет содержимое ---
 const bruno = createBruno()
@@ -91,12 +112,7 @@ void brunoView.load(ASSET_BRUNO, 0).then((ok) => {
 const brunoMarker = new FloatChip(document.body, game.camera, 'marker')
 const namePlate = new FloatChip(document.body, game.camera, 'name')
 const introBanner = new IntroBanner(document.body)
-brunoMarker.onTap = () => {
-  const point = new THREE.Vector3()
-  bruno.getWorldPosition(point)
-  point.y = 0
-  controller.goToInteract('bruno', point, 3)
-}
+brunoMarker.onTap = () => controller.goToInteract('bruno', brunoFrontPoint(), 0.2)
 brunoMarker.show(bruno, 'img:/ui/icons/talk.svg', { height: 3.1 })
 introBanner.show()
 let namePlateShown = false
@@ -280,6 +296,23 @@ async function bootWorld(): Promise<void> {
     triggerRadius: 2.5,
     onActivate: () => propActivated('friends'),
   })
+  // калитка: тизер новой территории
+  const gateNode = game.scene.getObjectByName('Gate')
+  if (gateNode) {
+    interaction.add({
+      id: 'gate',
+      object: gateNode,
+      triggerRadius: 2.6,
+      onActivate: () => {
+        if (!game.states.is('EXPLORE')) return
+        const prop = PROP_LINES['gate']
+        if (prop) {
+          sophieView.play('Curious')
+          void bubble.say(prop.line)
+        }
+      },
+    })
+  }
   // скамейка запускает миссию-воспоминание (доступна сразу)
   const benchNode = game.scene.getObjectByName('Bench')
   if (benchNode) {

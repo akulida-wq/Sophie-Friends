@@ -19,6 +19,10 @@
     "friends": {
       "line": "They're setting up a game. Soon there will be room for everyone!",
       "voice": "p_friends_game"
+    },
+    "gate": {
+      "line": "Beyond this gate there's a whole street to explore! Let's help our friends in the yard first — then we'll go for a walk together.",
+      "voice": "p_gate_street_teaser"
     }
   },
   "locked": {

@@ -146,10 +146,34 @@ function buildGrass(root: THREE.Group): void {
     [-9.4, -2.0, 1.0], [-5.6, 3.4, 0.9],
   ]
   const AVOID_R: [number, number, number, number][] = [
-    [6.6, 13.8, -6.2, 0.2],       // дом справа (x0,x1,z0,z1)
-    [-16.2, 8.0, 0.2, 2.6],       // дорожка ворота(запад) -> дом
-    [0.2, 2.6, -13.6, 0.6],       // ветка на площадку
+    [6.6, 13.8, -6.2, 0.2], // дом справа (x0,x1,z0,z1)
   ]
+  // Клетки дорожки — ТА ЖЕ сетка, что кладёт плитку в build_environment2.py:
+  // ни один пучок не может прорасти сквозь плиту.
+  const P = 1.06
+  const G0 = 0.87
+  const tileCells = new Set<string>()
+  const addRun = (xs: number[], zs: number[]) => {
+    for (const kx of xs) for (const kz of zs) tileCells.add(`${kx},${kz}`)
+  }
+  const range = (a: number, b: number) => {
+    const out: number[] = []
+    for (let k = a; k < b; k++) out.push(k)
+    return out
+  }
+  addRun(range(-16, 14), [0, 1])     // главная: ворота -> дом
+  addRun([0, 1], range(-13, 0))      // ветка на площадку
+  addRun([13], range(-7, 0))         // кольцо: восток
+  addRun(range(5, 14), [-7])         // кольцо: север
+  addRun([5], range(-7, 0))          // кольцо: запад (крыльцо)
+  const onTile = (x: number, z: number): boolean => {
+    const kx = Math.round((x - G0) / P)
+    const kz = Math.round((z - G0) / P)
+    if (!tileCells.has(`${kx},${kz}`)) return false
+    return (
+      Math.abs(x - (G0 + kx * P)) < 0.62 && Math.abs(z - (G0 + kz * P)) < 0.62
+    )
+  }
   const dummy = new THREE.Object3D()
   let placed = 0
   const HALF = 15.4
@@ -169,6 +193,7 @@ function buildGrass(root: THREE.Group): void {
       if (AVOID_C.some(([ax, az, ar]) => Math.hypot(x - ax, z - az) < ar)) continue
       if (AVOID_R.some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1))
         continue
+      if (onTile(x, z)) continue
     }
     dummy.position.set(x, 0, z)
     dummy.rotation.y = rand() * Math.PI * 2

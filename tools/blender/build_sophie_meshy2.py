@@ -273,12 +273,17 @@ def end(name):
 def tail_wag(f0, f1, period=8, amp=0.45):
     f = f0
     s = 1
-    while f <= f1:
+    while f < f1:
         kfa('tail1', f, amp * s, 'side')
         kfa('tail2', f, amp * 0.8 * s, 'side')
         kfa('tail3', f, amp * 0.6 * s, 'side')
         s = -s
         f += period
+    # замыкание цикла: значение на последнем кадре = значению первого,
+    # иначе на стыкеループа хвост дёргается скачком
+    kfa('tail1', f1, amp, 'side')
+    kfa('tail2', f1, amp * 0.8, 'side')
+    kfa('tail3', f1, amp * 0.6, 'side')
 
 L = S  # масштаб для location-амплитуд (рост модели)
 
