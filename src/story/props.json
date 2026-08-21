@@ -23,6 +23,10 @@
     "gate": {
       "line": "Beyond this gate there's a whole street to explore! Let's help our friends in the yard first — then we'll go for a walk together.",
       "voice": "p_gate_street_teaser"
+    },
+    "fountain": {
+      "line": "Ahh, fresh and cool! A little water break makes everything better.",
+      "voice": "p_fountain_drink"
     }
   },
   "locked": {

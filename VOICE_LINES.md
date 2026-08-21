@@ -43,6 +43,7 @@
 - p_friends_game — They're setting up a game. Soon there will be room for everyone!
 - p_gate_street_teaser — Beyond this gate there's a whole street to explore! Let's help our friends in the yard first — then we'll go for a walk together.
 - p_locked_bruno_first — Let's say hi to Bruno first — he looks like he could use a friend.
+- p_fountain_drink — Ahh, fresh and cool! A little water break makes everything better.
 
 ## СОФИ — финальное меню (опционально)
 - s8_sophie_hub_soon — Another friend is getting ready to meet you. We can visit them soon.

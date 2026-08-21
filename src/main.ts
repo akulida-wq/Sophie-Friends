@@ -318,6 +318,35 @@ async function bootWorld(): Promise<void> {
       },
     })
   }
+  // фонтан: Софи подходит и пьёт воду
+  const fountainInteractNode = game.scene.getObjectByName('Fountain')
+  if (fountainInteractNode) {
+    interaction.add({
+      id: 'fountain',
+      object: fountainInteractNode,
+      triggerRadius: 2.9,
+      onActivate: () => {
+        if (!game.states.is('EXPLORE')) return
+        // мордой к воде
+        const fp = new THREE.Vector3()
+        fountainInteractNode.getWorldPosition(fp)
+        const sp = game.sophie.position
+        game.sophie.rotation.y = Math.atan2(fp.x - sp.x, fp.z - sp.z)
+        // «пьёт»: нос к воде (Sniff), потом довольное виляние
+        sophieView.play('Sniff')
+        window.setTimeout(() => {
+          if (!controller.isMoving && game.states.is('EXPLORE')) {
+            sophieView.play('TailWag')
+            const prop = PROP_LINES['fountain']
+            if (prop) void bubble.say(prop.line)
+          }
+        }, 2600)
+        window.setTimeout(() => {
+          if (!controller.isMoving && game.states.is('EXPLORE')) sophieView.play('Idle')
+        }, 5400)
+      },
+    })
+  }
   // скамейка запускает миссию-воспоминание (доступна сразу)
   const benchNode = game.scene.getObjectByName('Bench')
   if (benchNode) {
