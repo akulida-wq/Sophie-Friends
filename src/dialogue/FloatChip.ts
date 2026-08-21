@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { renderIcon } from './icons'
 
 /**
  * Плавающая плашка над 3D-объектом (маркер-сердечко, имя персонажа).
@@ -23,7 +24,7 @@ export class FloatChip {
 
   show(target: THREE.Object3D, text: string, opts: { height?: number; autohideMs?: number } = {}): void {
     this.target = target
-    this.el.textContent = text
+    renderIcon(this.el, text)
     this.heightOffset = opts.height ?? 2.7
     this.el.classList.add('float-chip--on')
     if (this.hideTimer !== null) window.clearTimeout(this.hideTimer)

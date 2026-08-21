@@ -261,6 +261,11 @@
           "actor": "sophie",
           "line": "That was a brave first step.",
           "voice": "s4_sophie_brave_step"
+        },
+        {
+          "actor": "sophie",
+          "line": "Now a tiny step more: tap the ball, the blocks, or the chalk to start a little game together.",
+          "voice": "s4_sophie_minigame_guide"
         }
       ],
       "next": "minigame_approach",
@@ -292,9 +297,9 @@
       "actions": [
         {
           "actor": "bruno",
-          "anim": "SmallWave",
+          "anim": "NoticeSmile",
           "prop": "ball",
-          "note": "friendly gesture toward the group (no locomotion available)"
+          "note": "calm friendly turn to the group (no waving)"
         },
         {
           "actor": "friends",
@@ -303,8 +308,13 @@
         },
         {
           "actor": "sophie",
-          "line": "Sharing can open the door.",
+          "line": "Bruno picked up the ball to share — sharing can open the door!",
           "voice": "s4_sophie_sharing"
+        },
+        {
+          "actor": "sophie",
+          "line": "Now a tiny step more: tap the ball, the blocks, or the chalk to start a little game together.",
+          "voice": "s4_sophie_minigame_guide"
         }
       ],
       "next": "minigame_approach",
@@ -313,7 +323,7 @@
     {
       "id": "minigame_approach",
       "type": "minigame",
-      "camera": "follow_bruno",
+      "camera": "follow_sophie",
       "duration_hint_sec": 120,
       "mechanics": {
         "interaction": "tap_or_drag",
@@ -379,6 +389,11 @@
       "note": "Mild awkwardness only — NOT social rejection. Ball rolls slightly off / blocks wobble.",
       "intro_actions": [
         {
+          "actor": "sophie",
+          "line": "Oops — the ball rolled a little off. That's okay, wobbles happen! What should Bruno try?",
+          "voice": "s6_sophie_wobble_intro"
+        },
+        {
           "actor": "bruno",
           "anim": "TryJoinClumsy",
           "note": "first attempt is clumsy"
@@ -427,6 +442,11 @@
         {
           "actor": "friends",
           "anim": "WelcomeGesture"
+        },
+        {
+          "actor": "sophie",
+          "line": "He tried again — and it worked! Look how happy he is.",
+          "voice": "s7_sophie_tried_again"
         }
       ],
       "next": "resolution"
@@ -445,6 +465,11 @@
           "actor": "bruno",
           "anim": "TryAgainSucceed",
           "note": "co-regulated success with Sophie beside"
+        },
+        {
+          "actor": "sophie",
+          "line": "Together, then! Ready… gently… yes! That's it, Bruno!",
+          "voice": "s7_sophie_together"
         }
       ],
       "next": "resolution"

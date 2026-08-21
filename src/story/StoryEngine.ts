@@ -11,6 +11,7 @@ import type { TapCue } from '../dialogue/TapCue'
 import type { InteractionSystem } from '../interaction/InteractionSystem'
 import type { BrunoView } from '../interaction/BrunoView'
 import { iconFor, labelFromId } from '../dialogue/icons'
+import type { VideoOverlay } from '../dialogue/VideoOverlay'
 import type {
   ChoiceScene,
   CinematicChoiceScene,
@@ -34,6 +35,7 @@ export interface StoryEngineDeps {
   cinematicCamera: CinematicCamera
   choicePanel: ChoicePanel
   bubble: SophieBubble
+  videoOverlay?: VideoOverlay
   tapCue: TapCue
   interaction: InteractionSystem
   brunoView: BrunoView
@@ -395,6 +397,17 @@ export class StoryEngine {
       const action = queue.shift()
       if (!action) return done()
 
+      if (action.video) {
+        console.log(`[Cinematic] video insert: ${action.video}`)
+        if (this.deps.videoOverlay) {
+          this.deps.videoOverlay.play(action.video).then(() => {
+            if (gen === this.generation) step()
+          })
+        } else {
+          step()
+        }
+        return
+      }
       if (action.line) {
         console.log(`[Cinematic] ${action.actor ?? 'voice'}: "${action.line}"`)
         audio.voice(action.voice)
@@ -484,6 +497,16 @@ export class StoryEngine {
     }
   }
 
+  /** Мягко завершить миссию по желанию пользователя (кнопка выхода). */
+  abort(): void {
+    if (!this.active) return
+    this.deps.bubble.hideNow()
+    this.finish()
+  }
+
+  /** Вызывается после завершения миссии (любым способом). */
+  onFinished: (() => void) | null = null
+
   private finish(): void {
     this.invalidatePending()
     this.active = false
@@ -491,6 +514,10 @@ export class StoryEngine {
     this.deps.followCamera.focusOn(null)
     this.deps.followCamera.setEnabled(true) // eases home from the last shot
     this.deps.game.states.transition('EXPLORE')
+    // персонажи возвращаются к спокойным айдлам — никаких вечных танцев
+    this.deps.brunoView.setState(this.deps.brunoView.currentState)
+    this.deps.playActorAnim?.('sophie', 'Idle')
+    this.onFinished?.()
     console.log('[Story] segment complete — back to exploration')
   }
 }

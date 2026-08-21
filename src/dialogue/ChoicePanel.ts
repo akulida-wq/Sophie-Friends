@@ -1,3 +1,4 @@
+import { renderIcon } from './icons'
 import { audio } from '../audio/AudioSystem'
 
 export interface ChoiceOption {
@@ -39,9 +40,15 @@ export class ChoicePanel {
     if (content.promptText) {
       const prompt = document.createElement('div')
       prompt.className = 'choice-panel__prompt'
-      prompt.textContent = content.promptIcon
-        ? `${content.promptIcon} ${content.promptText}`
-        : content.promptText
+      if (content.promptIcon) {
+        const ic = document.createElement('span')
+        ic.className = 'choice-panel__prompt-icon'
+        renderIcon(ic, content.promptIcon)
+        prompt.appendChild(ic)
+      }
+      const txt = document.createElement('span')
+      txt.textContent = content.promptText
+      prompt.appendChild(txt)
       this.root.appendChild(prompt)
     }
 
@@ -56,7 +63,7 @@ export class ChoicePanel {
 
       const icon = document.createElement('span')
       icon.className = 'choice-card__icon'
-      icon.textContent = choice.icon
+      renderIcon(icon, choice.icon)
 
       const label = document.createElement('span')
       label.className = 'choice-card__label'

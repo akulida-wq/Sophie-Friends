@@ -34,6 +34,7 @@ export class BrunoView {
   private idleSad: THREE.AnimationAction | null = null
   private idleOpen: THREE.AnimationAction | null = null
   private overlay: THREE.AnimationAction | null = null
+  private overlayTimer: number | null = null
   private openTarget = 0
   private open = 0
   private state = 'withdrawn'
@@ -131,6 +132,8 @@ export class BrunoView {
       action.clampWhenFinished = true
     } else {
       action.setLoop(THREE.LoopRepeat, Infinity)
+      // цикличный оверлей (танец и т.п.) — не дольше 7 секунд
+      this.overlayTimer = window.setTimeout(() => this.clearOverlay(), 7000)
     }
     action.fadeIn(FADE)
     action.play()
@@ -138,6 +141,10 @@ export class BrunoView {
   }
 
   private clearOverlay(): void {
+    if (this.overlayTimer !== null) {
+      window.clearTimeout(this.overlayTimer)
+      this.overlayTimer = null
+    }
     if (this.overlay) {
       this.overlay.fadeOut(FADE)
       this.overlay = null

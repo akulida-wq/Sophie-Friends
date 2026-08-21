@@ -18,7 +18,12 @@ export class TapCue {
     this.button = document.createElement('button')
     this.button.className = 'tap-cue'
     this.button.type = 'button'
-    this.button.textContent = '💛'
+    const cueImg = document.createElement('img')
+    cueImg.src = '/ui/icons/tap.svg'
+    cueImg.alt = ''
+    cueImg.style.width = '68%'
+    cueImg.style.height = '68%'
+    this.button.appendChild(cueImg)
     this.button.setAttribute('aria-label', 'Continue')
     container.appendChild(this.button)
   }

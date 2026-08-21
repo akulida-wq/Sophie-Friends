@@ -73,6 +73,27 @@ export class InteractionSystem {
     return best
   }
 
+  /** Какой интерактив ткнут лучом (без проверки дистанции). */
+  findTapped(raycaster: THREE.Raycaster): Interactable | null {
+    if (!this.game.states.is('EXPLORE')) return null
+    for (const item of this.interactables) {
+      if (raycaster.intersectObject(item.object, true).length > 0) return item
+    }
+    return null
+  }
+
+  /** Активировать по id, если Софи уже в радиусе. */
+  activate(id: string): boolean {
+    if (!this.game.states.is('EXPLORE')) return false
+    const item = this.interactables.find((i) => i.id === id)
+    if (!item || !this.inRange(item)) return false
+    this.setGlow(item, 0)
+    audio.ui('tap')
+    if (this.overrideActivate?.(item.id)) return true
+    item.onActivate()
+    return true
+  }
+
   /**
    * Called by SophieController before the ground raycast. Returns true if
    * the tap hit an in-range interactable (consuming the tap).

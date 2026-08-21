@@ -18,6 +18,8 @@ import {
 } from './interaction/Placeholders'
 import { BrunoView } from './interaction/BrunoView'
 import { TapRipple } from './interaction/TapRipple'
+import { VideoOverlay } from './dialogue/VideoOverlay'
+import { ExitButton } from './safety/ExitButton'
 import { ChoicePanel } from './dialogue/ChoicePanel'
 import { SophieBubble } from './dialogue/SophieBubble'
 import { TapCue } from './dialogue/TapCue'
@@ -31,11 +33,12 @@ import { StoryEngine } from './story/StoryEngine'
 import type { StoryMission } from './story/types'
 import brunoMission from './story/bruno.json'
 import propsContent from './story/props.json'
+import memoryMission from './story/memory.json'
 
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
 const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=4'
 const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=5'
-const ASSET_ENV = '/assets/environment2.glb?v=12'
+const ASSET_ENV = '/assets/environment2.glb?v=16'
 
 const container = document.getElementById('app')
 if (!container) throw new Error('Missing #app container')
@@ -58,10 +61,20 @@ mood.onTempChange = (temp) => fireflies.setActive(temp === 'warm')
 const rewardGlow = new RewardGlow(document.body)
 const tapRipple = new TapRipple(game.scene)
 controller.onMoveTarget = (p) => tapRipple.show(p)
+const videoOverlay = new VideoOverlay(document.body)
 new PauseOverlay(document.body, game)
 new SoundToggle(document.body)
 
 controller.tapInterceptor = (raycaster) => interaction.tryActivate(raycaster)
+controller.findFarTap = (rc) => {
+  const item = interaction.findTapped(rc)
+  if (!item) return null
+  const point = new THREE.Vector3()
+  item.object.getWorldPosition(point)
+  point.y = 0
+  return { id: item.id, point, radius: item.triggerRadius }
+}
+controller.onArrivedAtInteract = (id) => interaction.activate(id)
 
 // --- Бруно: якорь-группа сразу (плейсхолдер), GLB подменяет содержимое ---
 const bruno = createBruno()
@@ -78,7 +91,7 @@ void brunoView.load(ASSET_BRUNO, 0).then((ok) => {
 const brunoMarker = new FloatChip(document.body, game.camera, 'marker')
 const namePlate = new FloatChip(document.body, game.camera, 'name')
 const introBanner = new IntroBanner(document.body)
-brunoMarker.show(bruno, '💛', { height: 3.1 })
+brunoMarker.show(bruno, 'img:/ui/icons/talk.svg', { height: 3.1 })
 introBanner.show()
 let namePlateShown = false
 
@@ -100,6 +113,7 @@ const story = new StoryEngine(
     brunoView,
     mood,
     rewardGlow,
+    videoOverlay,
     actors: {
       resolve: (actorId) =>
         actorId === 'sophie' ? game.sophie : game.scene.getObjectByName(actorId) ?? null,
@@ -113,6 +127,44 @@ const story = new StoryEngine(
   },
   brunoMission as StoryMission,
 )
+
+// --- Вторая миссия: «Солнечное воспоминание» у скамейки (видео-вставка) ---
+const memoryStory = new StoryEngine(
+  {
+    game,
+    followCamera,
+    cinematicCamera,
+    choicePanel,
+    bubble,
+    tapCue,
+    interaction,
+    brunoView,
+    mood,
+    rewardGlow,
+    videoOverlay,
+    actors: {
+      resolve: (actorId) =>
+        actorId === 'sophie' ? game.sophie : game.scene.getObjectByName(actorId) ?? null,
+    },
+    playActorAnim: (actorId, anim) =>
+      actorId === 'sophie' ? sophieView.play(anim) : false,
+  },
+  memoryMission as StoryMission,
+)
+
+// гейт: пока не познакомились с Бруно, остальной интерактив мягко
+// подсказывает первый шаг
+let brunoMet = false
+story.onFinished = () => {
+  brunoMet = true
+}
+
+// выход из сцены доступен всегда
+const exitButton = new ExitButton(document.body, () => {
+  story.abort()
+  memoryStory.abort()
+})
+game.addUpdatable(() => exitButton.setVisible(!game.states.is('EXPLORE')))
 
 const safety = new SafetyLayer(game, interaction, bubble, story)
 controller.onInput = () => safety.notifyActivity()
@@ -129,8 +181,27 @@ interaction.add({
 })
 
 // --- Мир: площадка из GLB; при неудаче — серый бокс-мир как раньше ---
-const PROP_LINES = (propsContent as { prop_lines: Record<string, { line: string }> })
-  .prop_lines
+const PROPS_CONTENT = propsContent as {
+  prop_lines: Record<string, { line: string }>
+  locked: { line: string }
+}
+const PROP_LINES = PROPS_CONTENT.prop_lines
+
+function propActivated(id: string): void {
+  if (!game.states.is('EXPLORE')) return
+  if (!brunoMet) {
+    // подсказываем первый шаг и подсвечиваем Бруно
+    sophieView.play('Curious')
+    void bubble.say(PROPS_CONTENT.locked.line)
+    brunoMarker.show(bruno, 'img:/ui/icons/talk.svg', { height: 3.1, autohideMs: 4000 })
+    return
+  }
+  const prop = PROP_LINES[id]
+  if (prop) {
+    sophieView.play(id === 'friends' ? 'Happy' : 'Curious')
+    void bubble.say(prop.line)
+  }
+}
 
 const PLACEHOLDER_PROPS: Record<PropId, [() => THREE.Group, [number, number, number]]> = {
   ball: [createBall, [3.5, 0, 1.5]],
@@ -185,32 +256,33 @@ async function bootWorld(): Promise<void> {
       game.scene.add(placeholder)
       object = placeholder
     }
+    if (id === 'tree') continue // дерево — декор, не интерактив
     interaction.add({
       id,
       object,
       triggerRadius: 2.5,
-      onActivate: () => {
-        const prop = PROP_LINES[id]
-        if (prop && game.states.is('EXPLORE')) {
-          sophieView.play('Curious')
-          void bubble.say(prop.line)
-        }
-      },
+      onActivate: () => propActivated(id),
     })
   }
-  // друзья — тоже интерактив с мягкой заглушкой
+  // друзья — интерактив с мягкой заглушкой
   interaction.add({
     id: 'friends',
     object: friends,
     triggerRadius: 2.5,
-    onActivate: () => {
-      const prop = PROP_LINES['friends']
-      if (prop && game.states.is('EXPLORE')) {
-        sophieView.play('Happy')
-        void bubble.say(prop.line)
-      }
-    },
+    onActivate: () => propActivated('friends'),
   })
+  // скамейка запускает миссию-воспоминание (доступна сразу)
+  const benchNode = game.scene.getObjectByName('Bench')
+  if (benchNode) {
+    interaction.add({
+      id: 'bench',
+      object: benchNode,
+      triggerRadius: 2.6,
+      onActivate: () => {
+        if (game.states.is('EXPLORE')) memoryStory.start()
+      },
+    })
+  }
 }
 
 void bootWorld()

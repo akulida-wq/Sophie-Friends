@@ -1,0 +1,53 @@
+{
+  "mission": "bench_memory",
+  "title": "A Sunny Memory",
+  "entry": "memory_intro",
+  "safety": {
+    "idle_hint_sec": 12,
+    "avoid_streak": 3,
+    "soft_branch_target": "memory_intro"
+  },
+  "scenes": [
+    {
+      "id": "memory_intro",
+      "type": "cinematic",
+      "camera": "follow_sophie",
+      "mood": {
+        "music": "ambient_calm"
+      },
+      "actions": [
+        {
+          "actor": "sophie",
+          "anim": "Sit",
+          "note": "sits by the bench"
+        },
+        {
+          "actor": "sophie",
+          "line": "This bench remembers so many sunny days. Want to peek at one?",
+          "voice": "m1_sophie_bench_intro"
+        }
+      ],
+      "next": "memory_clip"
+    },
+    {
+      "id": "memory_clip",
+      "type": "cinematic",
+      "camera": "follow_sophie",
+      "actions": [
+        {
+          "video": "memory1"
+        },
+        {
+          "actor": "sophie",
+          "anim": "TailWag"
+        },
+        {
+          "actor": "sophie",
+          "line": "That was a lovely day. We can make new ones just like it.",
+          "voice": "m1_sophie_bench_outro"
+        }
+      ],
+      "next": "end"
+    }
+  ]
+}

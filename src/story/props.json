@@ -20,5 +20,9 @@
       "line": "They're setting up a game. Soon there will be room for everyone!",
       "voice": "p_friends_game"
     }
+  },
+  "locked": {
+    "line": "Let's say hi to Bruno first — he looks like he could use a friend.",
+    "voice": "p_locked_bruno_first"
   }
 }

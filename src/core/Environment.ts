@@ -131,7 +131,7 @@ function buildGrass(root: THREE.Group): void {
   srcNode.visible = false
   if (!src) return
   const tuft = src as THREE.Mesh
-  const COUNT = 5600
+  const COUNT = 3600
   const inst = new THREE.InstancedMesh(tuft.geometry, tuft.material, COUNT)
   // детерминированный PRNG: трава не «пересеивается» между кадрами/сессиями
   let seed = 20260820
@@ -153,7 +153,7 @@ function buildGrass(root: THREE.Group): void {
   const dummy = new THREE.Object3D()
   let placed = 0
   const HALF = 15.4
-  const OUT_COUNT = 1400 // редкая трава на внешней территории (кроме улицы)
+  const OUT_COUNT = 1000 // редкая трава на внешней территории (кроме улицы)
   while (placed < COUNT) {
     const outer = placed >= COUNT - OUT_COUNT
     let x: number

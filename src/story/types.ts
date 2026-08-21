@@ -14,6 +14,8 @@ export interface MoodSpec {
 
 /** One staged step inside a scene — heterogeneous by design. */
 export interface StoryAction {
+  /** Кино-вставка: id ролика из /video/<id>.mp4 */
+  video?: string
   actor?: string
   anim?: string
   line?: string

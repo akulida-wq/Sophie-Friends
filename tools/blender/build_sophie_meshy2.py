@@ -325,27 +325,53 @@ def strip_scale_curves(act):
                         removed += 1
     return removed
 
-# --- Walk / Run: цикл Meshy как есть (Run — ускоренная копия).
-# ВАЖНО: у Meshy в кривых есть scale-треки (сжимают скелет до ~0.68 в
-# движении) — вырезаем, масштаб костей анимировать нельзя.
-for clip, scale in (('Walk', 1.0), ('Run', 0.55)):
-    act = walk_src.copy()
-    act.name = f'S2_{clip}'
-    print(f'[scale-strip] {clip}:', strip_scale_curves(act), 'curves removed')
-    # вертикаль таза из цикла Meshy утапливает собаку в землю
-    print(f'[hips-strip] {clip}:', strip_hips_location(act), 'curves removed')
-    act.use_fake_user = True
-    track = arm.animation_data.nla_tracks.new()
-    track.name = clip
-    strip = track.strips.new(clip, 1, act)
-    if hasattr(strip, 'action_slot') and getattr(strip, 'action_slot', None) is None:
-        try:
-            strip.action_slot = act.slots[0]
-        except Exception:
-            pass
-    if scale != 1.0:
-        strip.scale = scale
+# --- Walk: цикл Meshy как есть (scale-треки и вертикаль таза вырезаны:
+# первые сжимали скелет до ~0.68, вторая топила собаку в землю).
+act = walk_src.copy()
+act.name = 'S2_Walk'
+print('[scale-strip] Walk:', strip_scale_curves(act), 'curves removed')
+print('[hips-strip] Walk:', strip_hips_location(act), 'curves removed')
+act.use_fake_user = True
+track = arm.animation_data.nla_tracks.new()
+track.name = 'Walk'
+strip = track.strips.new('Walk', 1, act)
+if hasattr(strip, 'action_slot') and getattr(strip, 'action_slot', None) is None:
+    try:
+        strip.action_slot = act.slots[0]
+    except Exception:
+        pass
 walk_src.use_fake_user = False
+
+# --- Run: настоящий галоп (не ускоренный шаг): передние лапы парой,
+# задние парой в противофазе, корпус качается, есть фаза полёта (12f loop)
+begin(12)
+for f, a in ((1, 0.7), (7, -0.5), (12, 0.7)):
+    kfa('fA0', f, a, 'fwd')
+    kfa('fB0', f, a * 0.92, 'fwd')
+for f, a in ((1, -0.55), (7, 0.65), (12, -0.55)):
+    kfa('rA0', f, a, 'fwd')
+    kfa('rB0', f, a * 0.92, 'fwd')
+for f, a in ((1, -0.5), (7, 0.25), (12, -0.5)):
+    kfa('fA1', f, a, 'fwd')
+    kfa('fB1', f, a, 'fwd')
+for f, a in ((1, 0.35), (7, -0.3), (12, 0.35)):
+    kfa('rA1', f, a, 'fwd')
+    kfa('rB1', f, a, 'fwd')
+# галопный качок корпуса + вертикальный "бросок" (фаза полёта)
+for f, pch in ((1, 0.13), (7, -0.15), (12, 0.13)):
+    kfa('hips', f, pch)
+for f, z in ((1, -0.01 * L), (4, 0.055 * L), (7, 0.02 * L),
+             (10, 0.055 * L), (12, -0.01 * L)):
+    kfl('root', f, z)
+for f, pch in ((1, 0.1), (7, -0.12), (12, 0.1)):
+    kfa('head', f, pch, 'fwd')
+kfa('tail1', 1, -0.22)
+kfa('tail1', 12, -0.22)
+kfa('earA', 1, -0.15)
+kfa('earA', 12, -0.15)
+kfa('earB', 1, -0.15)
+kfa('earB', 12, -0.15)
+end('Run')
 
 # --- Idle: дыхание, медленный хвост, ушко (72f loop)
 begin(72)
@@ -363,7 +389,7 @@ end('Idle')
 # попа сама не опускается — её сажает root-drop. Drop чуть больше подъёма
 # плеч, чтобы попа дошла до земли, а лапы остались на месте.
 SIT_T = 0.55
-SIT_DROP = BODY_LEN * math.sin(SIT_T) + 0.012  # по замеру лапы
+SIT_DROP = BODY_LEN * math.sin(SIT_T) - 0.012  # по чистому замеру лапы
 begin(60)
 for k in ('rA0', 'rB0'):
     kfa(k, 1, 0.0, 'fwd')
@@ -488,6 +514,11 @@ end('Jump')
 reset_pose()
 
 # ------------------------------------------------------------- верификация
+# NLA-треки глушим: иначе нижние клипы подмешиваются под активный экшен
+# и портят замеры (в движке клипы изолированы — там это не проблема).
+for _tr in arm.animation_data.nla_tracks:
+    _tr.mute = True
+
 def clip_probe(clip, frame, key):
     act = bpy.data.actions[f'S2_{clip}']
     arm.animation_data.action = act

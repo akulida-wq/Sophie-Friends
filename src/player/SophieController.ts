@@ -35,6 +35,13 @@ export class SophieController {
   onAnimChange: ((state: AnimState) => void) | null = null
   /** Точка тапа по земле (риппл-индикатор). */
   onMoveTarget: ((point: THREE.Vector3) => void) | null = null
+  /** Тап по интерактиву издалека: вернуть точку и радиус подхода. */
+  findFarTap:
+    | ((rc: THREE.Raycaster) => { id: string; point: THREE.Vector3; radius: number } | null)
+    | null = null
+  /** Пришли к объекту из очереди — пора активировать. */
+  onArrivedAtInteract: ((id: string) => void) | null = null
+  private pendingInteract: string | null = null
   private stuckTime = 0
 
   constructor(private readonly game: Game) {
@@ -73,6 +80,22 @@ export class SophieController {
     const hit = this.raycaster.intersectObject(ground, false)[0]
     if (!hit) return
 
+    // тап по интерактиву издалека: идём к нему и активируем по прибытии
+    const far = this.findFarTap?.(this.raycaster)
+    if (far) {
+      const dir = this.game.sophie.position.clone().sub(far.point)
+      dir.y = 0
+      if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1)
+      dir.normalize()
+      this.target = far.point.clone().addScaledVector(dir, Math.min(1.6, far.radius * 0.55))
+      this.target.y = 0
+      resolveYardCollisions(this.target)
+      this.pendingInteract = far.id
+      this.onMoveTarget?.(this.target)
+      return
+    }
+
+    this.pendingInteract = null
     this.target = hit.point.clone()
     this.target.y = 0
     resolveYardCollisions(this.target) // цель не внутри препятствия
@@ -94,6 +117,7 @@ export class SophieController {
     if (distance <= ARRIVE_RADIUS) {
       this.target = null
       this.setAnim('Idle')
+      this.consumePendingInteract()
       return
     }
 
@@ -116,13 +140,23 @@ export class SophieController {
     // упёрлись в препятствие — мягко останавливаемся, а не топчемся
     if (pos.distanceTo(before) < step * 0.25) {
       this.stuckTime += dt
-      if (this.stuckTime > 0.5) {
+      if (this.stuckTime > 0.6) {
         this.target = null
         this.stuckTime = 0
         this.setAnim('Idle')
+        // упёрлись рядом с целью-объектом — всё равно пробуем активировать
+        this.consumePendingInteract()
       }
     } else {
       this.stuckTime = 0
+    }
+  }
+
+  private consumePendingInteract(): void {
+    if (this.pendingInteract) {
+      const id = this.pendingInteract
+      this.pendingInteract = null
+      this.onArrivedAtInteract?.(id)
     }
   }
 

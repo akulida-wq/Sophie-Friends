@@ -74,26 +74,27 @@ def clean_material(obj, tex_size=2048, roughness=None):
             mat.blend_method = 'OPAQUE'
         except Exception:
             pass
+        base_img = None
+        bc = pr.inputs.get('Base Color')
+        node = bc.links[0].from_node if (bc and bc.links) else None
+        for _ in range(4):
+            if node is None:
+                break
+            if node.type == 'TEX_IMAGE':
+                base_img = node.image
+                break
+            node = (node.inputs[0].links[0].from_node
+                    if node.inputs and node.inputs[0].links else None)
         for n in nt.nodes:
             if n.type == 'TEX_IMAGE' and n.image is not None:
-                imgs.add(n.image)
-    for img in imgs:
-        if max(img.size) > tex_size:
-            img.scale(tex_size, tex_size)
+                imgs.add((n.image, n.image is base_img))
+    for img, is_base in imgs:
+        cap = tex_size if is_base else min(tex_size, 1024)
+        if max(img.size) > cap:
+            img.scale(cap, cap)
 
 
-def decimate(obj, target_polys, planar=False):
-    n = len(obj.data.polygons)
-    if n <= target_polys:
-        return
-    mod = obj.modifiers.new('dec', 'DECIMATE')
-    if planar:
-        # для плоских плит: коллапс рвёт поверхность в дыры, DISSOLVE
-        # сливает копланарные грани начисто
-        mod.decimate_type = 'DISSOLVE'
-        mod.angle_limit = math.radians(7)
-    else:
-        mod.ratio = target_polys / n
+def _apply_mod(obj, mod):
     dg = bpy.context.evaluated_depsgraph_get()
     newmesh = bpy.data.meshes.new_from_object(obj.evaluated_get(dg))
     obj.modifiers.remove(mod)
@@ -101,6 +102,26 @@ def decimate(obj, target_polys, planar=False):
     obj.data = newmesh
     if old.users == 0:
         bpy.data.meshes.remove(old)
+
+
+def decimate(obj, target_polys, planar=False):
+    n = len(obj.data.polygons)
+    if n <= target_polys:
+        return
+    if planar:
+        # плоские плиты: DISSOLVE (коллапс рвёт в дыры), затем ОБЯЗАТЕЛЬНО
+        # триангуляция (коллапс по н-гонам снова дырявит), затем коллапс
+        mod = obj.modifiers.new('dec', 'DECIMATE')
+        mod.decimate_type = 'DISSOLVE'
+        mod.angle_limit = math.radians(15)
+        _apply_mod(obj, mod)
+        tri = obj.modifiers.new('tri', 'TRIANGULATE')
+        _apply_mod(obj, tri)
+    n2 = len(obj.data.polygons)
+    if n2 > target_polys and not planar:  # коллапс дырявит плоские плиты
+        mod = obj.modifiers.new('dec', 'DECIMATE')
+        mod.ratio = target_polys / n2
+        _apply_mod(obj, mod)
     print(f'[dec] {obj.name}: {n} -> {len(obj.data.polygons)}')
 
 
@@ -152,6 +173,28 @@ def linked_copy(obj, name):
     return c
 
 
+def merged_from(src_obj, name, transforms):
+    """Один меш из множества размещений src_obj (matrix-список).
+    Сотни маленьких объектов = сотни draw calls; слитый меш = один."""
+    import bmesh
+    bm = bmesh.new()
+    for M in transforms:
+        tmp = src_obj.data.copy()
+        tmp.transform(M)
+        bm.from_mesh(tmp)
+        bpy.data.meshes.remove(tmp)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    for mat in src_obj.data.materials:
+        me.materials.append(mat)
+    obj = bpy.data.objects.new(name, me)
+    scene.collection.objects.link(obj)
+    print(f'[merge] {name}: {len(transforms)} placements, '
+          f'{len(me.polygons)} polys, 1 draw call')
+    return obj
+
+
 def boxes_mesh(name, boxes, colors, roughness=0.9):
     verts, faces, cols = [], [], []
     for (cx, cy, z0, w, d, h), col in zip(boxes, colors):
@@ -185,46 +228,120 @@ def boxes_mesh(name, boxes, colors, roughness=0.9):
 
 # ------------------------------------------------------------ ассеты
 F = {
-    'house': 'Meshy_AI_Cozy_Clay_Cottage_0820123027_texture.glb',
-    'fence': 'Meshy_AI_Rounded_Wooden_Fence_0820122801_texture.glb',
-    'slide': 'Meshy_AI_Sagewood_Slide_0820122354_texture.glb',
-    'swing': 'Meshy_AI_Woodland_Swing_Set_0820122118_texture.glb',
-    'sandbox': 'Meshy_AI_Sandbox_Playset_0820122335_texture.glb',
-    'bench': 'Meshy_AI_Garden_Bench_0820122320_texture.glb',
-    'tree': 'Meshy_AI_Golden_Leaf_Whimsy_0820122208_texture.glb',
-    'bush': 'Meshy_AI_Soft_Succulent_Canopy_0820122344_texture.glb',
-    'grass': 'Meshy_AI_Emerald_Sprout_Cluste_0820122405_texture.glb',
-    'daisy': 'Meshy_AI_Fabric_Daisy_Garden_0820122159_texture.glb',
-    'cloud': 'Meshy_AI_Soft_Cloud_Cluster_0820122418_texture.glb',
-    'ball': 'Meshy_AI_Vintage_Kickoff_0820122137_texture.glb',
-    'blocks': 'Meshy_AI_Alphabet_Blocks_0820155120_texture.glb',
-    'chalk': 'Meshy_AI_Colorful_Chalk_Sticks_0820155913_texture.glb',
-    'gate': 'Meshy_AI_Rustic_Wooden_Garden__0820155303_texture.glb',
-    'pave': 'Meshy_AI_Rounded_Concrete_Pave_0820155531_texture.glb',
+    'house': 'house.glb',
+    'fence': 'fence.glb',
+    'slide': 'slide.glb',
+    'swing': 'swings.glb',
+    'sandbox': 'sandbox.glb',
+    'bench': 'bench.glb',
+    'tree': 'tree_golden.glb',
+    'bush': 'bush.glb',
+    'grass': 'grass_tuft.glb',
+    'daisy': 'daisies.glb',
+    'cloud': 'cloud.glb',
+    'ball': 'ball_soccer.glb',
+    'blocks': 'blocks_abc.glb',
+    'chalk': 'chalk_sticks.glb',
+    'gate': 'gate.glb',
+    'pave': 'pave_tile.glb',
 }
 
 # бюджеты подняты: видимой потери качества быть не должно
 house = load_asset(F['house'], 'House', height=5.6, polys=60000, tex=2048)
-fence = load_asset(F['fence'], 'FenceSeg', width=2.3, polys=3500, tex=512)
+fence = load_asset(F['fence'], 'FenceSeg', width=2.3, polys=1200, tex=512)
 slide = load_asset(F['slide'], 'Slide', height=2.3, polys=20000)
 swing = load_asset(F['swing'], 'Swing', height=2.4, polys=20000)
 sandbox = load_asset(F['sandbox'], 'Sandbox', width=3.0, polys=18000)
 bench = load_asset(F['bench'], 'Bench', width=1.9, polys=12000)
 tree = load_asset(F['tree'], 'Tree', height=4.3, polys=30000)
 bush = load_asset(F['bush'], 'Bush0', width=1.6, polys=12000, tex=512)
-grass = load_asset(F['grass'], 'GrassTuft', height=0.26, polys=450, tex=512)
+grass = load_asset(F['grass'], 'GrassTuft', height=0.26, polys=220, tex=512)
 daisy = load_asset(F['daisy'], 'Daisy0', height=0.55, polys=9000, tex=512)
 cloud = load_asset(F['cloud'], 'Cloud1', width=4.5, polys=5000, tex=256)
 ball = load_asset(F['ball'], 'Ball', height=0.55, polys=6000, tex=512)
 blocks = load_asset(F['blocks'], 'Blocks', width=1.1, polys=9000, tex=1024)
-chalk = load_asset(F['chalk'], 'Chalk', width=0.55, polys=6000, tex=512)
+chalk = load_asset(F['chalk'], 'Chalk', width=0.55, polys=16000, tex=512)
 gate = load_asset(F['gate'], 'Gate', width=4.7, polys=10000, tex=1024)
-pave = load_asset(F['pave'], 'PaveTile', width=0.98, polys=3000, tex=512, planar=True)
-# плитка должна лишь чуть выступать: плющим по высоте и топим в газон
-_pz = [v.co.z for v in pave.data.vertices]
-_ph = max(_pz) - min(_pz)
-pave.data.transform(Matrix.Scale(0.07 / _ph, 4, Vector((0, 0, 1))))
-pave.data.transform(Matrix.Translation((0, 0, -0.018)))
+# Плитка: меш Meshy не переживает никакую дециматизацию (двойная
+# оболочка рвётся в дыры). Решение: простой слэб со скруглённой фаской,
+# на который ЗАПЕКАЕТСЯ оригинальная текстура плитки.
+def make_baked_tile():
+    pre = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=os.path.join(SRC_DIR, F['pave']))
+    new = [o for o in bpy.data.objects if o not in pre]
+    src = max((o for o in new if o.type == 'MESH'),
+              key=lambda o: len(o.data.vertices))
+    for o in new:
+        if o is not src:
+            bpy.data.objects.remove(o, do_unlink=True)
+    clean_material(src, tex_size=512)
+    normalize(src, width=0.98)
+
+    W, H = 0.98, 0.12
+    me = bpy.data.meshes.new('PaveTile')
+    hw = W / 2
+    vs = [(-hw, -hw, 0), (hw, -hw, 0), (hw, hw, 0), (-hw, hw, 0),
+          (-hw, -hw, H), (hw, -hw, H), (hw, hw, H), (-hw, hw, H)]
+    fs = [(0, 1, 2, 3), (4, 7, 6, 5), (0, 4, 5, 1), (1, 5, 6, 2),
+          (2, 6, 7, 3), (3, 7, 4, 0)]
+    me.from_pydata(vs, [], fs)
+    me.validate()
+    slab = bpy.data.objects.new('PaveTile', me)
+    scene.collection.objects.link(slab)
+    bev = slab.modifiers.new('b', 'BEVEL')
+    bev.width = 0.035
+    bev.segments = 2
+    _apply_mod(slab, bev)
+    # простые box-UV вручную (ops в headless ненадёжны)
+    uv = slab.data.uv_layers.new(name='UVMap')
+    for poly in slab.data.polygons:
+        n = poly.normal
+        ax = 2 if abs(n.z) >= max(abs(n.x), abs(n.y)) else (0 if abs(n.x) > abs(n.y) else 1)
+        for li in poly.loop_indices:
+            co = slab.data.vertices[slab.data.loops[li].vertex_index].co
+            if ax == 2:
+                u, v = co.x / W + 0.5, co.y / W + 0.5
+            elif ax == 0:
+                u, v = co.y / W + 0.5, co.z / H
+            else:
+                u, v = co.x / W + 0.5, co.z / H
+            uv.data[li].uv = (u, v)
+    img = bpy.data.images.new('PaveBaked', 512, 512)
+    mat = bpy.data.materials.new('PaveTileMat')
+    mat.use_nodes = True
+    prn = next(n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    prn.inputs['Roughness'].default_value = 0.9
+    texn = mat.node_tree.nodes.new('ShaderNodeTexImage')
+    texn.image = img
+    mat.node_tree.links.new(texn.outputs['Color'], prn.inputs['Base Color'])
+    mat.node_tree.nodes.active = texn
+    slab.data.materials.append(mat)
+
+    prev_engine = scene.render.engine
+    try:
+        scene.render.engine = 'CYCLES'
+        scene.cycles.samples = 8
+        scene.cycles.device = 'CPU'
+        for o in bpy.data.objects:
+            o.select_set(o in (src, slab))
+        bpy.context.view_layer.objects.active = slab
+        bpy.ops.object.bake(type='DIFFUSE', pass_filter={'COLOR'},
+                            use_selected_to_active=True,
+                            cage_extrusion=0.1)
+        print('[pave] baked original texture onto slab')
+    except Exception as e:
+        print('[pave] bake failed, flat colour fallback:', e)
+        prn.inputs['Base Color'].default_value = (0.62, 0.6, 0.57, 1)
+    finally:
+        scene.render.engine = prev_engine
+    bpy.data.objects.remove(src, do_unlink=True)
+    # плющим и топим в газон
+    slab.data.transform(Matrix.Scale(0.07 / H, 4, Vector((0, 0, 1))))
+    slab.data.transform(Matrix.Translation((0, 0, -0.018)))
+    print(f'[pave] slab polys: {len(slab.data.polygons)}')
+    return slab
+
+pave = make_baked_tile()
 
 # ------------------------------------------------------- двор: композиция
 # Дом СПРАВА, крыльцом на запад (в сторону двора и улицы).
@@ -270,20 +387,13 @@ for i, (xz, rd, sc) in enumerate(DAISY_SPOTS):
     place(dobj, b(*xz), rot_deg=rd, scale=sc)
 
 # --------------------------------------------------- забор по периметру
-fence_parent = bpy.data.objects.new('FenceRing', None)
-scene.collection.objects.link(fence_parent)
 SEG = 2.28
 n_side = int(math.ceil(2 * YARD / SEG))
-idx = 0
+fence_tf = []
 
 def fence_at(x_b, y_b, rot_z):
-    global idx
-    fobj = fence if idx == 0 else linked_copy(fence, f'FenceSeg{idx}')
-    fobj.rotation_mode = 'XYZ'
-    fobj.location = (x_b, y_b, 0)
-    fobj.rotation_euler = (0, 0, rot_z)
-    fobj.parent = fence_parent
-    idx += 1
+    fence_tf.append(Matrix.Translation((x_b, y_b, 0))
+                    @ Matrix.Rotation(rot_z, 4, 'Z'))
 
 for i in range(n_side):
     x = -YARD + SEG / 2 + i * SEG
@@ -295,7 +405,8 @@ for i in range(n_side):
     if not (-GATE_Z[1] - SEG / 2 < y < -GATE_Z[0] + SEG / 2):
         fence_at(-YARD, y, -math.pi / 2)
     fence_at(YARD, y, math.pi / 2)                   # восток
-print(f'[fence] {idx} segments')
+merged_from(fence, 'FenceRing', fence_tf)
+bpy.data.objects.remove(fence, do_unlink=True)
 
 # --------------------------------------------------- дорожка из плиток
 TILE = 0.92
@@ -318,44 +429,51 @@ def path_tiles(boxes, cols, x0, z0, x1, z1):
             boxes.append((cx, -cz, 0.02, TILE, TILE, 0.055))
             cols.append((shade + warm, shade, shade - warm * 0.5))
 
-tiles_parent = bpy.data.objects.new('Path', None)
-scene.collection.objects.link(tiles_parent)
-_tile_i = 0
+# Все плитки живут на ОДНОЙ сетке (шаг P, начало 0.87): пересечения
+# дорожек делят общие клетки — стыки всегда ровные.
+P = TILE + GAP
+G0 = 0.87
 
-def lay_tiles(x0, z0, x1, z1):
-    global _tile_i
-    horizontal = abs(x1 - x0) > abs(z1 - z0)
-    length = abs((x1 - x0) if horizontal else (z1 - z0))
-    n = int(length / (TILE + GAP)) + 1
-    for i in range(n):
-        t = i * (TILE + GAP)
-        for lane in (-0.55, 0.55):
-            cx = (min(x0, x1) + t) if horizontal else (x0 + lane)
-            cz = (z0 + lane) if horizontal else (min(z0, z1) + t)
-            tl = pave if _tile_i == 0 else linked_copy(pave, f'PaveTile{_tile_i}')
-            tl.rotation_mode = 'XYZ'
-            tl.location = (cx, -cz, 0.0)
-            tl.rotation_euler = (0, 0, math.radians(random.choice([0, 90, 180, 270])))
-            sc = 1.0 + random.uniform(-0.02, 0.02)
-            tl.scale = (sc, sc, 1.0)
-            tl.parent = tiles_parent
-            _tile_i += 1
+def cell(k):
+    return G0 + k * P
 
-lay_tiles(-15.8, 1.4, 7.2, 1.4)   # ворота(запад) -> дом
-lay_tiles(1.4, 0.6, 1.4, -13.2)   # ветка на площадку
-print(f'[path] {_tile_i} tiles')
+cells = set()
+def add_run(ks_x, ks_z):
+    for kx in ks_x:
+        for kz in ks_z:
+            cells.add((kx, kz))
+
+# главная: от ворот до восточного края дома (ряды z k=0,1)
+add_run(range(-16, 14), (0, 1))
+# ветка на площадку (колонки x k=0,1)
+add_run((0, 1), range(-13, 0))
+# кольцо вокруг дома: восток (k=13), север (z k=-7), запад-крыльцо (k=5)
+add_run((13,), range(-7, 0))
+add_run(range(5, 14), (-7,))
+add_run((5,), range(-7, 0))
+
+path_tf = []
+for (kx, kz) in sorted(cells):
+    cx, cz = cell(kx), cell(kz)
+    if abs(cx) > YARD - 0.1 or abs(cz) > YARD - 0.1:
+        continue
+    sc = 1.0 + random.uniform(-0.02, 0.02)
+    path_tf.append(
+        Matrix.Translation((cx, -cz, 0.0))
+        @ Matrix.Rotation(math.radians(random.choice([0, 90, 180, 270])), 4, 'Z')
+        @ Matrix.Diagonal((sc, sc, 1.0, 1.0)))
+merged_from(pave, 'Path', path_tf)
 
 # ------------------------------------- улица слева: тротуар/бордюр/дорога
-side_parent = bpy.data.objects.new('Sidewalk', None)
-scene.collection.objects.link(side_parent)
+side_tf = []
 for i in range(int(64 / (TILE + GAP))):
     t = -32 + i * (TILE + GAP)
     for lane in (-17.15, -18.15):
-        tl = linked_copy(pave, f'SideTile{_tile_i + i * 2}')
-        tl.rotation_mode = 'XYZ'
-        tl.location = (lane, t, 0.0)
-        tl.rotation_euler = (0, 0, math.radians(random.choice([0, 90, 180, 270])))
-        tl.parent = side_parent
+        side_tf.append(
+            Matrix.Translation((lane, t, 0.0))
+            @ Matrix.Rotation(math.radians(random.choice([0, 90, 180, 270])), 4, 'Z'))
+merged_from(pave, 'Sidewalk', side_tf)
+bpy.data.objects.remove(pave, do_unlink=True)
 boxes_mesh('Curb', [(-18.9, 0, 0.0, 0.45, 64, 0.15)], [(0.63, 0.63, 0.6)])
 road_boxes = [(-21.6, 0, -0.015, 4.6, 64, 0.05)]
 road_cols = [(0.33, 0.34, 0.36)]
@@ -418,6 +536,8 @@ bpy.ops.export_scene.gltf(
     export_apply=False,
     export_skins=False,
     export_yup=True,
+    export_image_format='JPEG',  # без альфы; режет вес файла в разы
+    export_jpeg_quality=82,
 )
 print('[export] wrote', OUT, os.path.getsize(OUT), 'bytes')
 

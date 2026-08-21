@@ -2,6 +2,8 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 
 const CROSSFADE_SEC = 0.3
+const HOLD = new Set(['Sit', 'Sad']) // позы-удержания, не циклы
+
 const TARGET_HEIGHT = 0.95 // small dog next to Bruno (~2.4 world units)
 
 /**
@@ -88,7 +90,15 @@ export class SophieView {
     }
 
     next.enabled = true
-    next.reset().play()
+    next.reset()
+    if (HOLD.has(name)) {
+      // сесть/загрустить один раз и ОСТАТЬСЯ в позе до следующего клипа
+      next.setLoop(THREE.LoopOnce, 1)
+      next.clampWhenFinished = true
+    } else {
+      next.setLoop(THREE.LoopRepeat, Infinity)
+    }
+    next.play()
     if (this.current && this.current !== next) {
       this.current.crossFadeTo(next, CROSSFADE_SEC, false)
     } else {
