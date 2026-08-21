@@ -83,15 +83,7 @@ export class SophieController {
     // тап по интерактиву издалека: идём к нему и активируем по прибытии
     const far = this.findFarTap?.(this.raycaster)
     if (far) {
-      const dir = this.game.sophie.position.clone().sub(far.point)
-      dir.y = 0
-      if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1)
-      dir.normalize()
-      this.target = far.point.clone().addScaledVector(dir, Math.min(1.6, far.radius * 0.55))
-      this.target.y = 0
-      resolveYardCollisions(this.target)
-      this.pendingInteract = far.id
-      this.onMoveTarget?.(this.target)
+      this.goToInteract(far.id, far.point, far.radius)
       return
     }
 
@@ -150,6 +142,21 @@ export class SophieController {
     } else {
       this.stuckTime = 0
     }
+  }
+
+  /** Идти к объекту и активировать по прибытии (тап по нему или по маркеру). */
+  goToInteract(id: string, point: THREE.Vector3, radius: number): void {
+    if (!this.game.states.is('EXPLORE')) return
+    this.onInput?.()
+    const dir = this.game.sophie.position.clone().sub(point)
+    dir.y = 0
+    if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1)
+    dir.normalize()
+    this.target = point.clone().addScaledVector(dir, Math.min(1.6, radius * 0.55))
+    this.target.y = 0
+    resolveYardCollisions(this.target)
+    this.pendingInteract = id
+    this.onMoveTarget?.(this.target)
   }
 
   private consumePendingInteract(): void {

@@ -11,6 +11,8 @@ export class FloatChip {
   private readonly worldPos = new THREE.Vector3()
   private heightOffset = 2.7
   private hideTimer: number | null = null
+  /** Тап по плашке (например, маркер над Бруно = «поговорить»). */
+  onTap: (() => void) | null = null
 
   constructor(
     container: HTMLElement,
@@ -19,6 +21,12 @@ export class FloatChip {
   ) {
     this.el = document.createElement('div')
     this.el.className = `float-chip float-chip--${variant}`
+    this.el.addEventListener('pointerdown', (e) => {
+      if (this.onTap) {
+        e.stopPropagation()
+        this.onTap()
+      }
+    })
     container.appendChild(this.el)
   }
 
@@ -27,6 +35,8 @@ export class FloatChip {
     renderIcon(this.el, text)
     this.heightOffset = opts.height ?? 2.7
     this.el.classList.add('float-chip--on')
+    this.el.style.pointerEvents = this.onTap ? 'auto' : 'none'
+    this.el.style.cursor = this.onTap ? 'pointer' : 'default'
     if (this.hideTimer !== null) window.clearTimeout(this.hideTimer)
     if (opts.autohideMs) {
       this.hideTimer = window.setTimeout(() => this.hide(), opts.autohideMs)

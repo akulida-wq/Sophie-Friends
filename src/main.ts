@@ -38,7 +38,7 @@ import memoryMission from './story/memory.json'
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
 const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=4'
 const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=5'
-const ASSET_ENV = '/assets/environment2.glb?v=16'
+const ASSET_ENV = '/assets/environment2.glb?v=17'
 
 const container = document.getElementById('app')
 if (!container) throw new Error('Missing #app container')
@@ -91,6 +91,12 @@ void brunoView.load(ASSET_BRUNO, 0).then((ok) => {
 const brunoMarker = new FloatChip(document.body, game.camera, 'marker')
 const namePlate = new FloatChip(document.body, game.camera, 'name')
 const introBanner = new IntroBanner(document.body)
+brunoMarker.onTap = () => {
+  const point = new THREE.Vector3()
+  bruno.getWorldPosition(point)
+  point.y = 0
+  controller.goToInteract('bruno', point, 3)
+}
 brunoMarker.show(bruno, 'img:/ui/icons/talk.svg', { height: 3.1 })
 introBanner.show()
 let namePlateShown = false
@@ -210,7 +216,7 @@ const PLACEHOLDER_PROPS: Record<PropId, [() => THREE.Group, [number, number, num
   chalk: [createChalk, [1.5, 0, -4]],
 }
 
-const swayNodes: THREE.Object3D[] = []
+const swayNodes: { node: THREE.Object3D; amp: number }[] = []
 const cloudNodes: THREE.Object3D[] = []
 
 async function bootWorld(): Promise<void> {
@@ -220,11 +226,13 @@ async function bootWorld(): Promise<void> {
     game.scene.getObjectByName('ground')?.removeFromParent() // серый пол долой
     game.scene.add(env.root)
     props = env.props
-    for (const name of ['TreeDeco1', 'TreeDeco2', 'TreeDeco3', 'Tree',
-                        'Bushes']) {
+    for (const name of ['TreeDeco1', 'TreeDeco2', 'TreeDeco3', 'Tree']) {
       const node = env.root.getObjectByName(name)
-      if (node) swayNodes.push(node)
+      if (node) swayNodes.push({ node, amp: 0.012 })
     }
+    // кусты качаются каждый вокруг СВОЕЙ базы (группой их «подбрасывало»)
+    const bushes = env.root.getObjectByName('Bushes')
+    bushes?.children.forEach((bush) => swayNodes.push({ node: bush, amp: 0.005 }))
     for (let i = 1; i <= 4; i++) {
       const cl = env.root.getObjectByName(`Cloud${i}`)
       if (cl) {
@@ -233,6 +241,7 @@ async function bootWorld(): Promise<void> {
         cl.traverse((ch) => {
           const mesh = ch as THREE.Mesh
           if (mesh.isMesh) {
+            mesh.castShadow = false // тени облаков = «коричневые дыры» на газоне
             const m = mesh.material as THREE.MeshStandardMaterial
             m.fog = false
             // облако не должно сереть с теневой стороны
@@ -297,8 +306,8 @@ game.addUpdatable((dt) => mood.update(dt))
 game.addUpdatable((dt, elapsed) => fireflies.update(dt, elapsed))
 game.addUpdatable((dt, elapsed) => {
   // еле заметное покачивание зелени — медленный sin, не мигание
-  swayNodes.forEach((n, i) => {
-    n.rotation.z = Math.sin(elapsed * 0.4 + i * 1.7) * 0.012
+  swayNodes.forEach(({ node, amp }, i) => {
+    node.rotation.z = Math.sin(elapsed * 0.4 + i * 1.7) * amp
   })
   // облака: очень медленный дрейф с заворотом по кругу
   cloudNodes.forEach((n, i) => {

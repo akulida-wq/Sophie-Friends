@@ -234,7 +234,7 @@ F = {
     'swing': 'swings.glb',
     'sandbox': 'sandbox.glb',
     'bench': 'bench.glb',
-    'tree': 'tree_golden.glb',
+    'tree': 'tree_new.glb',
     'bush': 'bush.glb',
     'grass': 'grass_tuft.glb',
     'daisy': 'daisies.glb',
@@ -372,7 +372,7 @@ scene.collection.objects.link(bushes_parent)
 BUSH_SPOTS = [((-6.2, -13.9), 0, 1.0), ((13.9, -7.2), 70, 0.85),
               ((-14.3, -2.0), 30, 0.9), ((10.4, 13.6), 160, 0.8),
               ((14.2, 9.0), 200, 0.9), ((-8.8, 13.9), 300, 0.85),
-              ((0.6, 13.8), 260, 0.8), ((13.8, 1.4), 120, 0.75)]
+              ((0.6, 13.8), 260, 0.8), ((12.4, 4.8), 120, 0.75)]
 for i, (xz, rd, sc) in enumerate(BUSH_SPOTS):
     bobj = bush if i == 0 else linked_copy(bush, f'Bush{i}')
     place(bobj, b(*xz), rot_deg=rd, scale=sc)

@@ -4,7 +4,7 @@ import type { Game } from '../core/Game'
 import { collectMaterials, type Interactable } from './Interactable'
 
 const PULSE_PERIOD = 2.4 // seconds per full glow cycle — slow and soft
-const PULSE_MAX = 0.35 // peak emissive intensity, gentle (never a blink)
+const PULSE_MAX = 0.85 // peak emissive intensity, well visible (still no blink)
 
 /**
  * Tracks which interactable Sophie is near, drives the soft glow pulse,
@@ -38,7 +38,7 @@ export class InteractionSystem {
   private collectFor(interactable: Interactable): void {
     const materials = collectMaterials(interactable.object)
     for (const m of materials) {
-      m.emissive = new THREE.Color(0xfff2b8)
+      m.emissive = new THREE.Color(0xffdf8a)
       m.emissiveIntensity = 0
     }
     this.materialCache.set(interactable, materials)

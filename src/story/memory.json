@@ -23,11 +23,37 @@
         },
         {
           "actor": "sophie",
-          "line": "This bench remembers so many sunny days. Want to peek at one?",
+          "line": "This bench remembers so many sunny days.",
           "voice": "m1_sophie_bench_intro"
         }
       ],
-      "next": "memory_clip"
+      "next": "memory_choice"
+    },
+    {
+      "id": "memory_choice",
+      "type": "choice",
+      "camera": "follow_sophie",
+      "prompt": {
+        "line": "Want to peek at one of those days?",
+        "voice": "m1_sophie_peek_q",
+        "icon": "question"
+      },
+      "choices": [
+        {
+          "id": "peek",
+          "icon": "heart",
+          "label": "Yes, let's peek",
+          "next": "memory_clip"
+        },
+        {
+          "id": "later",
+          "icon": "away",
+          "label": "Another time",
+          "sophie_line": "Okay! The memory will wait for us right here.",
+          "voice": "m1_sophie_memory_waits",
+          "next": "end"
+        }
+      ]
     },
     {
       "id": "memory_clip",
