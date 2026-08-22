@@ -4,8 +4,8 @@
 Выход: public/assets/friend_{yellow,pink,red}.glb
 
 Клипы стандартизированы: Idle (главный цикл), Look (озирается),
-Chat (общается, у pink — второй айдл), Trick (только yellow: танец,
-red: бокс). Материал — виниловый глянец (roughness 0.4), базовый цвет
+Chat (общается, у pink — второй айдл). Трюков НЕТ: танец жёлтого и бокс
+красного у Meshy выглядят поломанными (Артур попросил убрать). Материал — виниловый глянец (roughness 0.4), базовый цвет
 родной. Rest-позу не вращаем (yaw в движке), scale-треки вырезаем.
 
 Запуск:
@@ -30,7 +30,6 @@ FRIENDS = {
             'Idle': 'Idle_7',
             'Look': 'Short_Breathe_and_Look_Around',
             'Chat': 'Stand_and_Chat',
-            'Trick': 'Hip_Hop_Dance_2',
         },
         'polys': 26000,
     },
@@ -46,10 +45,9 @@ FRIENDS = {
     'red': {
         'file': 'red_merged.glb',
         'clips': {
-            'Idle': 'Idle_15',
+            'Idle': 'Idle_9',   # Idle_15 держит руку поднятой — выглядит сломанной
             'Look': 'Short_Breathe_and_Look_Around',
             'Chat': 'Stand_and_Chat',
-            'Trick': 'Boxing_Guard_Prep_Straight_Punch',
         },
         'polys': 24000,
     },

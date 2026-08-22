@@ -121,8 +121,8 @@ brunoMarker.show(bruno, 'img:/ui/icons/talk.svg', { height: 3.1 })
 introBanner.show()
 let namePlateShown = false
 
-// --- Друзья-монстрики у песочницы: Idle + изредка Look/Chat, трюки по
-// расписанию (раз в минуту, по очереди: жёлтый танцует, красный боксирует)
+// --- Друзья-монстрики у песочницы: Idle + изредка Look/Chat (трюки Meshy
+// убраны — выглядели поломанными)
 const friends = new THREE.Group()
 friends.name = 'friends'
 friends.position.set(4.9, 0, -8.6)
@@ -132,9 +132,9 @@ game.scene.add(friends)
 // красный в центре лицом к камере, жёлтый и розовый по бокам — боком к нам,
 // лицом друг к другу (yaw 0 = мордой на юг/камеру, +π/2 = на восток)
 const FRIEND_SPECS = [
-  { id: 'yellow', url: '/assets/friend_yellow.glb?v=1', offset: [-1.6, 0.45], yaw: 1.25, height: 2.0 },
-  { id: 'red', url: '/assets/friend_red.glb?v=1', offset: [0.0, -0.5], yaw: 0.05, height: 2.05 },
-  { id: 'pink', url: '/assets/friend_pink.glb?v=1', offset: [1.6, 0.45], yaw: -1.25, height: 1.8 },
+  { id: 'yellow', url: '/assets/friend_yellow.glb?v=2', offset: [-1.6, 0.45], yaw: 1.25, height: 2.0 },
+  { id: 'red', url: '/assets/friend_red.glb?v=2', offset: [0.0, -0.5], yaw: 0.05, height: 2.05 },
+  { id: 'pink', url: '/assets/friend_pink.glb?v=2', offset: [1.6, 0.45], yaw: -1.25, height: 1.8 },
 ] as const
 const friendViews: FriendView[] = []
 const friendLoads: Promise<boolean>[] = []
@@ -150,11 +150,8 @@ for (const spec of FRIEND_SPECS) {
 // свечение интерактива должно светить настоящие модели, не пустую группу
 void Promise.all(friendLoads).then(() => interaction.invalidate('friends'))
 // живость: ~95% времени — базовые айдлы; изредка кто-то один озирается/
-// болтает (раз в 20–35с), трюки — раз в 2 минуты по очереди
+// болтает (раз в 20–35с)
 let friendFidgetAt = 18
-// трюки: раз в ~2 минуты, по очереди (жёлтый танец -> красный бокс)
-let trickAt = 70
-let trickTurn = 0
 
 // --- Story: mission JSON drives everything after this point ---
 const story = new StoryEngine(
@@ -525,14 +522,6 @@ game.addUpdatable((_dt, elapsed) => {
     const f = friendViews[Math.floor(elapsed * 7.13) % friendViews.length]
     f.playOnce(Math.floor(elapsed * 3.7) % 2 === 0 ? 'Look' : 'Chat')
     friendFidgetAt = elapsed + 20 + (elapsed * 5.3) % 15
-  }
-  if (elapsed >= trickAt) {
-    // показ раз в ~2 минуты, строго по очереди: жёлтый -> красный -> жёлтый...
-    const performer = friendViews.find((_, i) =>
-      FRIEND_SPECS[i].id === (trickTurn % 2 === 0 ? 'yellow' : 'red'))
-    if (performer?.hasClip('Trick')) performer.playOnce('Trick')
-    trickTurn++
-    trickAt = elapsed + 120
   }
 })
 game.addUpdatable((dt, elapsed) => {

@@ -97,7 +97,9 @@ Mix-MULTIPLY (build_environment2.py); трава там не сеется (AVOID
 группа (4.9,-8.6): yellow(-1.6,0.45) yaw 1.25 (боком, лицом на восток),
 red(0,-0.5) yaw 0.05 (центр, лицом к камере), pink(1.6,0.45) yaw -1.25
 (боком). yaw 0 = мордой на юг/камеру. Жизнь: фиджеты Look/Chat раз в
-20–35с у одного, трюки раз в 120с по очереди жёлтый→красный (первый на 70с).
+20–35с у одного. ТРЮКОВ НЕТ (танец/бокс Meshy выглядят поломанными —
+убраны по просьбе Артура; friend_*.glb v=2, red Idle=Idle_9, т.к. Idle_15
+держит руку поднятой).
 
 ## Движок — что добавлено поверх фаз
 - Очередь кликов: тап по объекту издалека → Софи идёт (goToInteract) →
@@ -168,10 +170,9 @@ change NOTHING, [LEFT/RIGHT/BACK] view» в одном чате. Друзья: �
 rigged + pretty.
 
 ## Статус / хвосты
-- Друзья ГОТОВЫ: friend_{yellow,pink,red}.glb (build_friends.py из
-  «Friends (riggs + animation)/*_merged.glb»), клипы Idle/Look/Chat(+Trick
-  у yellow=танец, red=бокс). FriendView + main: фиджеты раз в 9-17с,
-  трюки раз в 60с по очереди (жёлтый→красный). Портреты
+- Друзья ГОТОВЫ: friend_{yellow,pink,red}.glb v=2 (build_friends.py из
+  «Friends (riggs + animation)/*_merged.glb»), клипы Idle/Look/Chat, без
+  трюков. Превью всех клипов Meshy: tools/blender/preview_friend_clips.py. Портреты
   public/ui/portrait_{yellow,red,pink}.png (круглые, для будущих плашек).
 - Финал миссии: реплика s7_sophie_look_bruno («Look — Bruno is playing
   with everyone now!...»), end-menu: Keep exploring the yard / Play again /
