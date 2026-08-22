@@ -111,7 +111,7 @@ Stand_and_Chat УБРАН у всех — он разворачивает кор
   tapInterceptor перехватывает тап даже в радиусе: если Софи дальше 0.7 м от
   точки — сначала подбегает) + разворот к нему.
 - Бруно в сценах успеха (recovery_*) — IdleOpen, без прыжка
-  (Jump_with_Arms_Open Артур попросил убрать). Фонтан FOUNTAIN_VOLUME 0.35.
+  (Jump_with_Arms_Open Артур попросил убрать). Фонтан FOUNTAIN_VOLUME 0.52, питьё sfx 0.3.
   sfx/drink.mp3 — вырезка 2.8с из dog_drinks.mp3 (окно 7.2–10.0с).
 - Маркер над Бруно (talk-иконка) кликабелен (FloatChip.onTap).
 - Коллизии двора: resolveYardCollisions (круги + прямоугольник дома +

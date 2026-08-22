@@ -485,7 +485,7 @@ async function bootWorld(): Promise<void> {
         lastDrinkAt = performance.now()
         // «пьёт»: нос к воде (Sniff) + журчание, потом довольное виляние
         sophieView.play('Sniff')
-        audio.sfx('drink', 0.45)
+        audio.sfx('drink', 0.3)
         window.setTimeout(() => {
           if (game.states.is('EXPLORE')) {
             if (!controller.isMoving) sophieView.play('TailWag')

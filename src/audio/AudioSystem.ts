@@ -16,7 +16,7 @@ type UiSound = 'tap' | 'card' | 'cue' | 'reward'
 
 const MASTER_VOLUME = 0.22
 const VOICE_VOLUME = 0.9
-const FOUNTAIN_VOLUME = 0.35 // относительно master (музыка 0.55–0.8); вдвое тише по просьбе Артура
+const FOUNTAIN_VOLUME = 0.52 // относительно master (музыка 0.55–0.8); подобрано с Артуром (0.7 → 0.35 → 0.52)
 // микс на время кино-вставки (воспоминание): музыка тише, фонтан и птицы слышны
 const VIDEO_MUSIC_DUCK = 0.03 // основная музыка почти уходит — у ролика своя
 const VIDEO_FOUNTAIN = 0.4
