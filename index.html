@@ -430,6 +430,14 @@
         text-align: center;
         padding: 0 6vw;
       }
+    
+      /* Клавиша H — спрятать интерфейс для чистых скриншотов (референсы для видео, питч) */
+      body.hud-hidden .pause-button, body.hud-hidden .sound-button,
+      body.hud-hidden .exit-button, body.hud-hidden .intro-banner,
+      body.hud-hidden .tap-cue, body.hud-hidden .float-chip,
+      body.hud-hidden .sophie-bubble, body.hud-hidden .choice-panel {
+        visibility: hidden !important;
+      }
     </style>
   </head>
   <body>

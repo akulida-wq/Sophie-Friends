@@ -560,6 +560,13 @@ game.addUpdatable(() => {
 game.addUpdatable((dt) => tapRipple.update(dt))
 game.addUpdatable((dt) => safety.update(dt))
 
+// H — спрятать/показать HUD (чистые скриншоты для референсов видео и питча)
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'h' || e.key === 'H' || e.key === 'р' || e.key === 'Р') {
+    document.body.classList.toggle('hud-hidden')
+  }
+})
+
 game.start()
 
 // Debug handles for manual testing from the browser console.

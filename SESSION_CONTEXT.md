@@ -193,6 +193,8 @@ rigged + pretty.
   mp3 через Blender VSE mixdown — tools/blender/encode_mp3.py; ffmpeg в системе
   НЕТ); sfx/chalk.mp3 от Артура. Голоса: все новые id на месте, кроме
   s7_sophie_look_bruno.
+- Клавиша H (и русская Р) прячет HUD (body.hud-hidden, CSS в index.html) —
+  для чистых скриншотов-референсов (видео в Higgsfield image-to-video).
 - Ждём от Артура: public/video/memory1.mp4; голос s7_sophie_look_bruno.
 - Дальше по плану Артура: интерфейс, логика, камера (после визуала).
 - Старые ассеты сохранены (sophie.glb, sophie_meshy.glb, bruno.glb,
