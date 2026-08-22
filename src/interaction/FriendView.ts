@@ -50,7 +50,12 @@ export class FriendView {
       this.actions.set(clip.name, this.mixer.clipAction(clip))
     }
     this.idle = this.actions.get('Idle') ?? null
-    this.idle?.play()
+    if (this.idle) {
+      // рассинхрон: каждый дышит в своём темпе и со своей фазы
+      this.idle.timeScale = 0.9 + Math.random() * 0.2
+      this.idle.play()
+      this.idle.time = Math.random() * this.idle.getClip().duration
+    }
     this.mixer.addEventListener('finished', (e) => {
       if (e.action === this.overlay) this.clearOverlay()
     })

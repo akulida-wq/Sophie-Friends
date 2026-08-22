@@ -145,9 +145,9 @@ game.scene.add(friends)
 // красный в центре лицом к камере, жёлтый и розовый по бокам — боком к нам,
 // лицом друг к другу (yaw 0 = мордой на юг/камеру, +π/2 = на восток)
 const FRIEND_SPECS = [
-  { id: 'yellow', url: '/assets/friend_yellow.glb?v=2', offset: [-1.6, 0.45], yaw: 1.25, height: 2.0 },
-  { id: 'red', url: '/assets/friend_red.glb?v=2', offset: [0.0, -0.5], yaw: 0.05, height: 2.05 },
-  { id: 'pink', url: '/assets/friend_pink.glb?v=2', offset: [1.6, 0.45], yaw: -1.25, height: 1.8 },
+  { id: 'yellow', url: '/assets/friend_yellow.glb?v=3', offset: [-1.6, 0.45], yaw: 1.25, height: 2.0 },
+  { id: 'red', url: '/assets/friend_red.glb?v=3', offset: [0.0, -0.5], yaw: 0.05, height: 2.05 },
+  { id: 'pink', url: '/assets/friend_pink.glb?v=3', offset: [1.6, 0.45], yaw: -1.25, height: 1.8 },
 ] as const
 const friendViews: FriendView[] = []
 const friendLoads: Promise<boolean>[] = []
@@ -533,7 +533,9 @@ game.addUpdatable((_dt, elapsed) => {
   if (elapsed >= friendFidgetAt) {
     // случайный друг коротко оживает — Look или Chat
     const f = friendViews[Math.floor(elapsed * 7.13) % friendViews.length]
-    f.playOnce(Math.floor(elapsed * 3.7) % 2 === 0 ? 'Look' : 'Chat')
+    // Chat есть только у розового (второй спокойный айдл); у остальных — Look
+    const fidget = Math.floor(elapsed * 3.7) % 2 === 0 && f.hasClip('Chat') ? 'Chat' : 'Look'
+    f.playOnce(fidget)
     friendFidgetAt = elapsed + 20 + (elapsed * 5.3) % 15
   }
 })

@@ -29,7 +29,7 @@ FRIENDS = {
         'clips': {
             'Idle': 'Idle_7',
             'Look': 'Short_Breathe_and_Look_Around',
-            'Chat': 'Stand_and_Chat',
+            # Stand_and_Chat разворачивает корпус боком — убран
         },
         'polys': 26000,
     },
@@ -47,7 +47,7 @@ FRIENDS = {
         'clips': {
             'Idle': 'Idle_9',   # Idle_15 держит руку поднятой — выглядит сломанной
             'Look': 'Short_Breathe_and_Look_Around',
-            'Chat': 'Stand_and_Chat',
+            # Stand_and_Chat разворачивает корпус боком — убран
         },
         'polys': 24000,
     },
