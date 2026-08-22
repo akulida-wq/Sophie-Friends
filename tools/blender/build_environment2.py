@@ -347,13 +347,13 @@ pave = make_baked_tile()
 
 # ------------------------------------------------------- двор: композиция
 # Дом СПРАВА, крыльцом на запад (в сторону двора и улицы).
-place(house, b(10.2, -3.0), rot_deg=-82)
+place(house, b(10.2, -3.0), rot_deg=-90)  # ровно крыльцом на запад
 
 # площадка на севере
 place(slide, b(-3.0, -11.6), rot_deg=15)
 place(swing, b(4.4, -12.6), rot_deg=4)
-place(sandbox, b(7.4, -9.4), rot_deg=-12)
-place(bench, b(6.2, 8.6), rot_deg=-90)  # ровно вдоль дорожки к лавке
+place(sandbox, b(8.5, -9.4), rot_deg=0)   # по сетке, ближе к дому
+place(bench, b(7.3, 8.6), rot_deg=-90)  # РЯДОМ с дорожкой (восточнее), лицом к ней
 place(fountain, b(-5.5, 9.6), rot_deg=15)
 
 # интерактив по всей территории
@@ -375,7 +375,7 @@ scene.collection.objects.link(bushes_parent)
 BUSH_SPOTS = [((-6.2, -15.1), 0, 1.0), ((13.9, -7.2), 70, 0.85),
               ((-15.1, -2.0), 30, 0.9), ((10.4, 13.6), 160, 0.8),
               ((13.3, 9.0), 200, 0.9), ((-8.8, 13.9), 300, 0.85),
-              ((0.6, 13.8), 260, 0.8), ((12.4, 4.8), 120, 0.75)]
+              ((-12.0, -15.1), 260, 0.8), ((12.4, 4.8), 120, 0.75)]
 for i, (xz, rd, sc) in enumerate(BUSH_SPOTS):
     bobj = bush if i == 0 else linked_copy(bush, f'Bush{i}')
     place(bobj, b(*xz), rot_deg=rd, scale=sc)
@@ -414,21 +414,32 @@ def tinted_daisy(name, tint):
         d.materials[i] = mc
     return obj
 
-daisy_pink = tinted_daisy('FlowerPink', (1.0, 0.55, 0.72))
-daisy_blue = tinted_daisy('FlowerBlue', (0.6, 0.68, 1.0))
-BED_SPOTS = [((-1.7, 11.2), 15, 0.75, 'p'), ((-1.0, 12.0), 130, 0.6, 'b'),
-             ((-0.3, 11.1), 240, 0.7, 'w'), ((0.4, 12.1), 60, 0.75, 'p'),
-             ((1.1, 11.3), 300, 0.6, 'b'), ((1.8, 11.9), 180, 0.7, 'p'),
-             ((-1.4, 12.6), 90, 0.6, 'b'), ((0.1, 12.8), 210, 0.7, 'w'),
-             ((1.5, 12.6), 330, 0.65, 'b'), ((-0.6, 13.0), 45, 0.6, 'p'),
-             ((0.9, 10.8), 155, 0.6, 'w'), ((-2.1, 12.2), 275, 0.65, 'p'),
-             ((2.2, 11.4), 20, 0.6, 'b')]
-for i, (xz, rd, sc, ck) in enumerate(BED_SPOTS):
-    src = {'p': daisy_pink, 'b': daisy_blue, 'w': daisy}.get(ck, daisy)
-    fobj = linked_copy(src, f'Flower{i}')
-    place(fobj, b(*xz), rot_deg=rd, scale=sc)
-for proto in (daisy_pink, daisy_blue):
-    bpy.data.objects.remove(proto, do_unlink=True)  # данные живут в копиях
+# сад-клумба: плотная сетка кустиков с дрожанием, 4 тона вперемешку —
+# от фонтана до лавки, между поперечной дорожкой и южным периметром
+protos = {
+    'p': tinted_daisy('FlowerPink', (1.0, 0.55, 0.72)),
+    'b': tinted_daisy('FlowerBlue', (0.6, 0.68, 1.0)),
+    'o': tinted_daisy('FlowerOrange', (1.0, 0.72, 0.38)),
+    'w': daisy,
+}
+garden_rng = random.Random(11)
+tones = 'pbwopbwpobwp'
+i = 0
+for gz in (10.55, 11.3, 12.05, 12.8, 13.45):
+    for gx in range(-8, 11):          # x -4.4 .. 5.2 шагом 0.55
+        x = -4.4 + (gx + 8) * 0.53 + garden_rng.uniform(-0.14, 0.14)
+        z = gz + garden_rng.uniform(-0.16, 0.16)
+        if abs(x) > 5.3:
+            continue
+        ck = tones[(i * 5 + int(gz * 3)) % len(tones)]
+        fobj = linked_copy(protos[ck], f'Flower{i}')
+        place(fobj, b(x, z), rot_deg=garden_rng.uniform(0, 360),
+              scale=0.5 + garden_rng.uniform(0, 0.22))
+        i += 1
+print(f'[garden] {i} flower clumps')
+for key, proto in protos.items():
+    if key != 'w':
+        bpy.data.objects.remove(proto, do_unlink=True)  # данные живут в копиях
 
 # --------------------------------------------------- забор по периметру
 SEG = 2.28
@@ -498,8 +509,11 @@ add_run((5,), range(-7, 0))
 # южные ветки: к фонтану и к лавке
 add_run((-6,), range(2, 9))
 add_run((5,), range(2, 9))
-# поперечная: от фонтана до лавки
-add_run(range(-6, 6), (8,))
+# поперечная: от западного периметра через фонтан до лавки
+add_run(range(-14, 6), (8,))
+# от фонтана и от лавки — вниз к южному периметру
+add_run((-6,), range(9, 13))
+add_run((5,), range(9, 13))
 # периметр вдоль забора — двор оплетён прямоугольником
 add_run(range(-14, 14), (-14,))
 add_run(range(-14, 14), (13,))

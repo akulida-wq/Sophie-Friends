@@ -508,8 +508,8 @@
         },
         {
           "actor": "sophie",
-          "line": "Lonely feelings can shrink when we take kind little steps.",
-          "voice": "s7_sophie_shrink"
+          "line": "Look — Bruno is playing with everyone now! Our small kind steps made his lonely feeling smaller.",
+          "voice": "s7_sophie_look_bruno"
         },
         {
           "actor": "bruno",
@@ -541,6 +541,12 @@
       ],
       "options": [
         {
+          "id": "keep_exploring",
+          "icon": "footstep",
+          "label": "Keep exploring the yard",
+          "action": "free_roam"
+        },
+        {
           "id": "play_again",
           "icon": "replay",
           "label": "Play again",
@@ -551,12 +557,6 @@
           "icon": "friends",
           "label": "Visit another friend later",
           "action": "to_hub_stub"
-        },
-        {
-          "id": "quiet_play",
-          "icon": "leaf",
-          "label": "Quiet play",
-          "action": "free_roam"
         }
       ],
       "mood": {

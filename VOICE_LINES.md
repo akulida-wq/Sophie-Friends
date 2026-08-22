@@ -23,7 +23,8 @@
 - s6_sophie_one_little_thing — Bruno can still try one little thing.
 - s7_sophie_tried_again — He tried again — and it worked! Look how happy he is.
 - s7_sophie_together — Together, then! Ready… gently… yes! That's it, Bruno!
-- s7_sophie_shrink — Lonely feelings can shrink when we take kind little steps.
+- ~~s7_sophie_shrink~~ — УСТАРЕЛО, заменено:
+- s7_sophie_look_bruno — Look — Bruno is playing with everyone now! Our small kind steps made his lonely feeling smaller.
 - s8_sophie_recap — We noticed Bruno's feeling. We helped him take a step. We kept going kindly.
 
 ## БРУНО (другой голос!)
@@ -62,6 +63,7 @@
 - p_chalk_already — We already drew a sun here! Let's save the chalk for another day.
 
 ## ЕЩЁ НЕ ЗАПИСАНО (сводка)
+- s7_sophie_look_bruno
 - p_fountain_drink, p_fountain_full
 - s6_sophie_oops_ball, s6_sophie_oops_blocks, s6_sophie_oops_chalk
 - p_chalk_later, p_chalk_drawn, p_chalk_already

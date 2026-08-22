@@ -42,7 +42,7 @@ import memoryMission from './story/memory.json'
 // v-параметры обновлять при замене ассетов — сбрасывают кеш браузера.
 const ASSET_SOPHIE = '/assets/sophie_meshy2.glb?v=5'
 const ASSET_BRUNO = '/assets/bruno_meshy.glb?v=5'
-const ASSET_ENV = '/assets/environment2.glb?v=19'
+const ASSET_ENV = '/assets/environment2.glb?v=21'
 
 const container = document.getElementById('app')
 if (!container) throw new Error('Missing #app container')
@@ -125,14 +125,16 @@ let namePlateShown = false
 // расписанию (раз в минуту, по очереди: жёлтый танцует, красный боксирует)
 const friends = new THREE.Group()
 friends.name = 'friends'
-friends.position.set(4.6, 0, -8.6)
+friends.position.set(4.9, 0, -8.6)
 game.scene.add(friends)
 
-// полукруг, раскрытый к камере (юг): все трое видны, чуть повёрнуты к центру
+// полукруг с просветом (≈1.8 м между соседями — текстуры не касаются):
+// красный в центре лицом к камере, жёлтый и розовый по бокам — боком к нам,
+// лицом друг к другу (yaw 0 = мордой на юг/камеру, +π/2 = на восток)
 const FRIEND_SPECS = [
-  { id: 'yellow', url: '/assets/friend_yellow.glb?v=1', offset: [-1.15, 0.15], yaw: 0.35, height: 2.0 },
-  { id: 'pink', url: '/assets/friend_pink.glb?v=1', offset: [0.0, 0.75], yaw: 0, height: 1.8 },
-  { id: 'red', url: '/assets/friend_red.glb?v=1', offset: [1.15, 0.1], yaw: -0.35, height: 2.05 },
+  { id: 'yellow', url: '/assets/friend_yellow.glb?v=1', offset: [-1.6, 0.45], yaw: 1.25, height: 2.0 },
+  { id: 'red', url: '/assets/friend_red.glb?v=1', offset: [0.0, -0.5], yaw: 0.05, height: 2.05 },
+  { id: 'pink', url: '/assets/friend_pink.glb?v=1', offset: [1.6, 0.45], yaw: -1.25, height: 1.8 },
 ] as const
 const friendViews: FriendView[] = []
 const friendLoads: Promise<boolean>[] = []
@@ -147,10 +149,11 @@ for (const spec of FRIEND_SPECS) {
 }
 // свечение интерактива должно светить настоящие модели, не пустую группу
 void Promise.all(friendLoads).then(() => interaction.invalidate('friends'))
-// живость: каждый изредка озирается/болтает (вразнобой)
-let friendFidgetAt = 14
-// трюки: раз в минуту, по очереди (0 = жёлтый танец, 2 = красный бокс)
-let trickAt = 25
+// живость: ~95% времени — базовые айдлы; изредка кто-то один озирается/
+// болтает (раз в 20–35с), трюки — раз в 2 минуты по очереди
+let friendFidgetAt = 18
+// трюки: раз в ~2 минуты, по очереди (жёлтый танец -> красный бокс)
+let trickAt = 70
 let trickTurn = 0
 
 // --- Story: mission JSON drives everything after this point ---
@@ -515,14 +518,15 @@ game.addUpdatable((_dt, elapsed) => {
     // случайный друг коротко оживает — Look или Chat
     const f = friendViews[Math.floor(elapsed * 7.13) % friendViews.length]
     f.playOnce(Math.floor(elapsed * 3.7) % 2 === 0 ? 'Look' : 'Chat')
-    friendFidgetAt = elapsed + 9 + (elapsed * 5.3) % 8
+    friendFidgetAt = elapsed + 20 + (elapsed * 5.3) % 15
   }
   if (elapsed >= trickAt) {
-    // показ раз в минуту, строго по очереди: жёлтый -> красный -> жёлтый...
-    const performer = trickTurn % 2 === 0 ? friendViews[0] : friendViews[2]
+    // показ раз в ~2 минуты, строго по очереди: жёлтый -> красный -> жёлтый...
+    const performer = friendViews.find((_, i) =>
+      FRIEND_SPECS[i].id === (trickTurn % 2 === 0 ? 'yellow' : 'red'))
     if (performer?.hasClip('Trick')) performer.playOnce('Trick')
     trickTurn++
-    trickAt = elapsed + 60
+    trickAt = elapsed + 120
   }
 })
 game.addUpdatable((dt, elapsed) => {
