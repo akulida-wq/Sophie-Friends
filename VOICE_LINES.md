@@ -19,7 +19,7 @@
 - s4_sophie_staying_away — Sometimes staying away keeps the lonely feeling big. Let's try a tiny step together.
 - s4_sophie_sharing — Bruno picked up the ball to share — sharing can open the door!
 - s5_sophie_little_step — A little step is enough.
-- s6_sophie_wobble_intro — Oops — the ball rolled a little off. That's okay, wobbles happen! What should Bruno try?
+- ~~s6_sophie_wobble_intro~~ — УСТАРЕЛО, заменено на s6_sophie_oops_* ниже
 - s6_sophie_one_little_thing — Bruno can still try one little thing.
 - s7_sophie_tried_again — He tried again — and it worked! Look how happy he is.
 - s7_sophie_together — Together, then! Ready… gently… yes! That's it, Bruno!
@@ -49,10 +49,19 @@
 ## СОФИ — финальное меню (опционально)
 - s8_sophie_hub_soon — Another friend is getting ready to meet you. We can visit them soon.
 
-## СОФИ — «вобл» после минигры (вариант под выбранный предмет)
-(s6_sophie_wobble_intro про мяч уже записан — эти два добивают кубики и мелки)
-- s6_sophie_wobble_blocks — Oops — the tower gave a little wobble. That's okay, wobbles happen! What should Bruno try?
-- s6_sophie_wobble_chalk — Oops — the chalk line went a bit squiggly. That's okay, wobbles happen! What should Bruno try?
+## СОФИ — «упс» после минигры (вариант под выбранный предмет)
+(старый s6_sophie_wobble_intro больше не используется — перезаписать)
+- s6_sophie_oops_ball — Oops — our ball rolled right past the friends. That's okay, first tries are tricky! What shall we do now?
+- s6_sophie_oops_blocks — Oops — our tower tipped over. That's okay, first tries are tricky! What shall we do now?
+- s6_sophie_oops_chalk — Oops — our chalk sun got a little smudged. That's okay, first tries are tricky! What shall we do now?
+
+## СОФИ — рисование мелом (после миссии с Бруно)
+(вопрос — уже записанный p_chalk_draw)
+- p_chalk_later — Okay — the chalk will wait for us right here.
+- p_chalk_drawn — A sunny sun for everyone who walks by!
+- p_chalk_already — We already drew a sun here! Let's save the chalk for another day.
 
 ## ЕЩЁ НЕ ЗАПИСАНО (сводка)
-- p_fountain_drink, p_fountain_full, s6_sophie_wobble_blocks, s6_sophie_wobble_chalk
+- p_fountain_drink, p_fountain_full
+- s6_sophie_oops_ball, s6_sophie_oops_blocks, s6_sophie_oops_chalk
+- p_chalk_later, p_chalk_drawn, p_chalk_already

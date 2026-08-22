@@ -3,7 +3,7 @@ import { Game } from './core/Game'
 import { Mood } from './core/Mood'
 import { Fireflies } from './core/Fireflies'
 import { FountainWater } from './core/FountainWater'
-import { loadEnvironment, type PropId } from './core/Environment'
+import { loadEnvironment, nearestTileCenter, type PropId } from './core/Environment'
 import { SophieController } from './player/SophieController'
 import { SophieView } from './player/SophieView'
 import { FollowCamera } from './camera/FollowCamera'
@@ -18,6 +18,7 @@ import {
 } from './interaction/Placeholders'
 import { BrunoView } from './interaction/BrunoView'
 import { FriendView } from './interaction/FriendView'
+import { ChalkDrawing } from './interaction/ChalkDrawing'
 import { TapRipple } from './interaction/TapRipple'
 import { VideoOverlay } from './dialogue/VideoOverlay'
 import { ExitButton } from './safety/ExitButton'
@@ -31,6 +32,7 @@ import { PauseOverlay } from './safety/PauseOverlay'
 import { SoundToggle } from './safety/SoundToggle'
 import { SafetyLayer } from './safety/SafetyLayer'
 import { audio } from './audio/AudioSystem'
+import { iconFor } from './dialogue/icons'
 import { StoryEngine } from './story/StoryEngine'
 import type { StoryMission } from './story/types'
 import brunoMission from './story/bruno.json'
@@ -214,6 +216,7 @@ story.onFinished = () => {
 const exitButton = new ExitButton(document.body, () => {
   story.abort()
   memoryStory.abort()
+  cancelChalkActivity()
 })
 game.addUpdatable(() => exitButton.setVisible(!game.states.is('EXPLORE')))
 
@@ -232,11 +235,93 @@ interaction.add({
 })
 
 // --- Мир: площадка из GLB; при неудаче — серый бокс-мир как раньше ---
+type Line = { line: string; voice?: string }
 const PROPS_CONTENT = propsContent as {
-  prop_lines: Record<string, { line: string; voice?: string }>
-  locked: { line: string; voice?: string }
+  prop_lines: Record<string, Line>
+  locked: Line
+  chalk_activity: {
+    prompt: Line & { icon?: string }
+    choices: { id: string; icon: string; label: string }[]
+    later: Line
+    drawn: Line
+    already: Line
+  }
 }
 const PROP_LINES = PROPS_CONTENT.prop_lines
+
+// --- Мелки после миссии: выбор «нарисовать / в другой раз», солнышко на
+// ближайшей плитке; нарисовано — на всю сессию (без таймера)
+let chalkDrawing: ChalkDrawing | null = null
+let chalkGen = 0 // выход/отмена обесценивает отложенные шаги
+let chalkBusy = false
+
+function sayLine(l: Line, anim: string): void {
+  sophieView.play(anim)
+  audio.voice(l.voice)
+  void bubble.say(l.line)
+}
+
+function cancelChalkActivity(): void {
+  if (!chalkBusy) return
+  chalkGen++
+  chalkBusy = false
+  choicePanel.hide()
+  if (!game.states.is('EXPLORE')) game.states.transition('EXPLORE')
+  sophieView.play('Idle')
+}
+
+function chalkActivity(): void {
+  const act = PROPS_CONTENT.chalk_activity
+  if (chalkDrawing?.drawn) return sayLine(act.already, 'Happy')
+  chalkBusy = true
+  const gen = ++chalkGen
+  game.states.transition('CHOICE')
+  sophieView.play('Curious')
+  audio.voice(act.prompt.voice)
+  choicePanel.show(
+    {
+      promptIcon: iconFor(act.prompt.icon),
+      promptText: act.prompt.line,
+      choices: act.choices.slice(0, 3).map((c) => ({ id: c.id, icon: iconFor(c.icon), label: c.label })),
+    },
+    (pick) => {
+      if (gen !== chalkGen) return
+      choicePanel.hide()
+      if (pick === 'draw') return drawChalkSun(act, gen)
+      chalkBusy = false
+      game.states.transition('EXPLORE')
+      sayLine(act.later, 'Idle')
+    },
+  )
+}
+
+function drawChalkSun(act: typeof PROPS_CONTENT.chalk_activity, gen: number): void {
+  game.states.transition('CINEMATIC') // кнопка выхода видна, ходьба на паузе
+  const sp = game.sophie.position
+  // не на плитке, где лежат сами мелки — рисунок должен быть виден
+  const chalkNode = game.scene.getObjectByName('Chalk')
+  const chalkAt = chalkNode ? chalkNode.getWorldPosition(new THREE.Vector3()) : undefined
+  const tile = nearestTileCenter(sp.x, sp.z, chalkAt) ?? new THREE.Vector3(sp.x, 0, sp.z + 1)
+  // мордой к плитке, рисунок — на ней (чуть выше плиты)
+  game.sophie.rotation.y = Math.atan2(tile.x - sp.x, tile.z - sp.z)
+  chalkDrawing = new ChalkDrawing(game.scene, tile.clone().setY(0.075))
+  sophieView.play('Sniff') // носом к земле — «рисует»
+  audio.sfx('chalk', 0.4)
+  window.setTimeout(() => {
+    if (gen === chalkGen) chalkDrawing?.reveal()
+  }, 1400)
+  window.setTimeout(() => {
+    if (gen !== chalkGen) return
+    sophieView.play('TailWag')
+    audio.voice(act.drawn.voice)
+    void bubble.say(act.drawn.line).then(() => {
+      if (gen !== chalkGen) return
+      chalkBusy = false
+      game.states.transition('EXPLORE')
+      sophieView.play('Idle')
+    })
+  }, 3200)
+}
 
 function propActivated(id: string): void {
   if (!game.states.is('EXPLORE')) return
@@ -250,6 +335,7 @@ function propActivated(id: string): void {
     brunoMarker.show(bruno, 'img:/ui/icons/talk.svg', { height: 3.1, autohideMs: 4000 })
     return
   }
+  if (id === 'chalk') return chalkActivity()
   const prop = PROP_LINES[id]
   if (prop) {
     sophieView.play(id === 'friends' ? 'Happy' : 'Curious')
@@ -423,6 +509,7 @@ game.addUpdatable((dt) => mood.update(dt))
 game.addUpdatable((dt, elapsed) => fireflies.update(dt, elapsed))
 game.addUpdatable((dt, elapsed) => fountainWater?.update(dt, elapsed))
 game.addUpdatable((dt) => friendViews.forEach((f) => f.update(dt)))
+game.addUpdatable((dt) => chalkDrawing?.update(dt))
 game.addUpdatable((_dt, elapsed) => {
   if (elapsed >= friendFidgetAt) {
     // случайный друг коротко оживает — Look или Chat

@@ -36,5 +36,28 @@
   "locked": {
     "line": "Let's say hi to Bruno first — he looks like he could use a friend.",
     "voice": "p_locked_bruno_first"
+  },
+  "chalk_activity": {
+    "prompt": {
+      "line": "We could draw something kind on the path for everyone to see.",
+      "voice": "p_chalk_draw",
+      "icon": "chalk"
+    },
+    "choices": [
+      { "id": "draw", "icon": "sun", "label": "Draw a sun" },
+      { "id": "later", "icon": "later", "label": "Another time" }
+    ],
+    "later": {
+      "line": "Okay — the chalk will wait for us right here.",
+      "voice": "p_chalk_later"
+    },
+    "drawn": {
+      "line": "A sunny sun for everyone who walks by!",
+      "voice": "p_chalk_drawn"
+    },
+    "already": {
+      "line": "We already drew a sun here! Let's save the chalk for another day.",
+      "voice": "p_chalk_already"
+    }
   }
 }

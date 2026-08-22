@@ -120,6 +120,62 @@ function buildSkyDome(): THREE.Mesh {
   return mesh
 }
 
+// Клетки дорожки — ТА ЖЕ сетка, что кладёт плитку в build_environment2.py:
+// трава не прорастает сквозь плиту, а мел рисует на настоящей плитке.
+const TILE_P = 1.06
+const TILE_G0 = 0.87
+const TILE_CELLS = (() => {
+  const cells = new Set<string>()
+  const addRun = (xs: number[], zs: number[]) => {
+    for (const kx of xs) for (const kz of zs) cells.add(`${kx},${kz}`)
+  }
+  const range = (a: number, b: number) => {
+    const out: number[] = []
+    for (let k = a; k < b; k++) out.push(k)
+    return out
+  }
+  addRun(range(-16, 14), [0, 1])     // главная: ворота -> дом
+  addRun([0, 1], range(-13, 0))      // ветка на площадку
+  addRun([13], range(-7, 0))         // кольцо: восток
+  addRun(range(5, 14), [-7])         // кольцо: север
+  addRun([5], range(-7, 0))          // кольцо: запад (крыльцо)
+  addRun([-6], range(2, 9))          // южная ветка: к фонтану
+  addRun([5], range(2, 9))           // южная ветка: к лавке
+  addRun(range(-6, 6), [8])          // поперечная: фонтан -> лавка
+  addRun(range(-14, 14), [-14])      // периметр вдоль забора: север
+  addRun(range(-14, 14), [13])       // юг
+  addRun([-14], range(-14, 14))      // запад
+  addRun([13], range(-14, 14))       // восток
+  return cells
+})()
+
+/** Центр ближайшей плитки дорожки (в радиусе ~2 клеток) или null.
+ *  `avoid` — точка, чью плитку пропускаем (например, где лежит предмет). */
+export function nearestTileCenter(
+  x: number,
+  z: number,
+  avoid?: { x: number; z: number },
+): THREE.Vector3 | null {
+  const kx0 = Math.round((x - TILE_G0) / TILE_P)
+  const kz0 = Math.round((z - TILE_G0) / TILE_P)
+  let best: THREE.Vector3 | null = null
+  let bestD = Infinity
+  for (let kx = kx0 - 2; kx <= kx0 + 2; kx++) {
+    for (let kz = kz0 - 2; kz <= kz0 + 2; kz++) {
+      if (!TILE_CELLS.has(`${kx},${kz}`)) continue
+      const cx = TILE_G0 + kx * TILE_P
+      const cz = TILE_G0 + kz * TILE_P
+      if (avoid && Math.abs(cx - avoid.x) < 0.75 && Math.abs(cz - avoid.z) < 0.75) continue
+      const d = Math.hypot(cx - x, cz - z)
+      if (d < bestD) {
+        bestD = d
+        best = new THREE.Vector3(cx, 0, cz)
+      }
+    }
+  }
+  return best
+}
+
 /** Трава: InstancedMesh из узла GrassTuft (v2), рассыпанная по острову. */
 function buildGrass(root: THREE.Group): void {
   const srcNode = root.getObjectByName('GrassTuft')
@@ -151,37 +207,13 @@ function buildGrass(root: THREE.Group): void {
   const AVOID_R: [number, number, number, number][] = [
     [6.6, 13.8, -6.2, 0.2], // дом справа (x0,x1,z0,z1)
   ]
-  // Клетки дорожки — ТА ЖЕ сетка, что кладёт плитку в build_environment2.py:
-  // ни один пучок не может прорасти сквозь плиту.
-  const P = 1.06
-  const G0 = 0.87
-  const tileCells = new Set<string>()
-  const addRun = (xs: number[], zs: number[]) => {
-    for (const kx of xs) for (const kz of zs) tileCells.add(`${kx},${kz}`)
-  }
-  const range = (a: number, b: number) => {
-    const out: number[] = []
-    for (let k = a; k < b; k++) out.push(k)
-    return out
-  }
-  addRun(range(-16, 14), [0, 1])     // главная: ворота -> дом
-  addRun([0, 1], range(-13, 0))      // ветка на площадку
-  addRun([13], range(-7, 0))         // кольцо: восток
-  addRun(range(5, 14), [-7])         // кольцо: север
-  addRun([5], range(-7, 0))          // кольцо: запад (крыльцо)
-  addRun([-6], range(2, 9))          // южная ветка: к фонтану
-  addRun([5], range(2, 9))           // южная ветка: к лавке
-  addRun(range(-6, 6), [8])          // поперечная: фонтан -> лавка
-  addRun(range(-14, 14), [-14])      // периметр вдоль забора: север
-  addRun(range(-14, 14), [13])       // юг
-  addRun([-14], range(-14, 14))      // запад
-  addRun([13], range(-14, 14))       // восток
   const onTile = (x: number, z: number): boolean => {
-    const kx = Math.round((x - G0) / P)
-    const kz = Math.round((z - G0) / P)
-    if (!tileCells.has(`${kx},${kz}`)) return false
+    const kx = Math.round((x - TILE_G0) / TILE_P)
+    const kz = Math.round((z - TILE_G0) / TILE_P)
+    if (!TILE_CELLS.has(`${kx},${kz}`)) return false
     return (
-      Math.abs(x - (G0 + kx * P)) < 0.62 && Math.abs(z - (G0 + kz * P)) < 0.62
+      Math.abs(x - (TILE_G0 + kx * TILE_P)) < 0.62 &&
+      Math.abs(z - (TILE_G0 + kz * TILE_P)) < 0.62
     )
   }
   const dummy = new THREE.Object3D()

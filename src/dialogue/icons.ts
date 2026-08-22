@@ -24,6 +24,9 @@ const ICONS: Record<string, string> = {
   friends: `img:${DIR}/friends.svg`,
   leaf: `img:${DIR}/leaf.svg`,
   talk: `img:${DIR}/talk.svg`,
+  sun: `img:${DIR}/sun.svg`,
+  chalk: `img:${DIR}/sun.svg`,
+  later: `img:${DIR}/leaf.svg`,
   tap: `img:${DIR}/tap.svg`,
 }
 

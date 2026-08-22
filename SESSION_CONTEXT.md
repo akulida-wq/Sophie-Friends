@@ -136,6 +136,14 @@ yaw 0.35/0/-0.35 (yaw 0 = мордой на юг/камеру).
   вариант line_variants по выбранному предмету (мяч/кубики/мелки), проп-
   анимация чужого предмета скипается. end_menu to_hub_stub озвучен
   (s8_sophie_hub_soon). outcome_tree: Бруно НЕ садится (IdleSad).
+- Мелки после миссии (brunoMet): chalk_activity в props.json — панель
+  «Draw a sun / Another time» (state CHOICE), рисование: Sniff + sfx
+  'chalk' → ChalkDrawing (процедурная меловая текстура-солнышко, плоский
+  декаль на ближайшей плитке, НЕ на плитке самих мелков —
+  nearestTileCenter(x,z,avoid)) → TailWag + реплика. Нарисовано — на всю
+  сессию, повторный тап = «already». Exit отменяет (chalkGen).
+- Реплика после минигры: s6_sophie_oops_{ball,blocks,chalk} от лица «мы»,
+  без слова wobble (старая запись wobble_intro не используется).
 - Портреты плашек: круглые кропы из 2D-артов Артура (Freinds fotos) —
   tools/blender/make_art_portraits.py; ссылки с ?v=2 (кеш-баст).
 
@@ -161,9 +169,9 @@ rigged + pretty.
   у yellow=танец, red=бокс). FriendView + main: фиджеты раз в 9-17с,
   трюки раз в 60с по очереди (жёлтый→красный). Портреты
   public/ui/portrait_{yellow,red,pink}.png (круглые, для будущих плашек).
-- Ждём от Артура: public/video/memory1.mp4; озвучка p_fountain_drink,
-  p_fountain_full, s6_sophie_wobble_blocks, s6_sophie_wobble_chalk;
-  звук питья public/assets/sfx/drink.mp3 (папку создать).
+- Ждём от Артура: public/video/memory1.mp4; озвучка — см. раздел
+  «ЕЩЁ НЕ ЗАПИСАНО» в VOICE_LINES.md; звуки public/assets/sfx/drink.mp3
+  и chalk.mp3.
 - Дальше по плану Артура: интерфейс, логика, камера (после визуала).
 - Старые ассеты сохранены (sophie.glb, sophie_meshy.glb, bruno.glb,
   environment.glb) — откат = смена ASSET_* в main.ts.

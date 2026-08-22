@@ -390,20 +390,20 @@
       "intro_actions": [
         {
           "actor": "sophie",
-          "line": "Oops — a little wobble! That's okay, wobbles happen. What should Bruno try?",
-          "voice": "s6_sophie_wobble_any",
+          "line": "Oops — it didn't quite work the first time. That's okay, first tries are tricky! What shall we do now?",
+          "voice": "s6_sophie_oops_any",
           "line_variants": {
             "ball": {
-              "line": "Oops — the ball rolled a little off. That's okay, wobbles happen! What should Bruno try?",
-              "voice": "s6_sophie_wobble_intro"
+              "line": "Oops — our ball rolled right past the friends. That's okay, first tries are tricky! What shall we do now?",
+              "voice": "s6_sophie_oops_ball"
             },
             "blocks": {
-              "line": "Oops — the tower gave a little wobble. That's okay, wobbles happen! What should Bruno try?",
-              "voice": "s6_sophie_wobble_blocks"
+              "line": "Oops — our tower tipped over. That's okay, first tries are tricky! What shall we do now?",
+              "voice": "s6_sophie_oops_blocks"
             },
             "chalk": {
-              "line": "Oops — the chalk line went a bit squiggly. That's okay, wobbles happen! What should Bruno try?",
-              "voice": "s6_sophie_wobble_chalk"
+              "line": "Oops — our chalk sun got a little smudged. That's okay, first tries are tricky! What shall we do now?",
+              "voice": "s6_sophie_oops_chalk"
             }
           }
         },
