@@ -123,6 +123,7 @@ export class StoryEngine {
     this.deps.choicePanel.hide()
     this.deps.bubble.hideNow()
     this.deps.tapCue.hide()
+    this.deps.videoOverlay?.cancel()
     this.deps.interaction.overrideActivate = null
     this.deps.interaction.setHint(null)
     if (this.minigameTimer !== null) {

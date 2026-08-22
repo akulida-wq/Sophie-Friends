@@ -33,6 +33,9 @@ export class VideoOverlay {
   private captionTimer: number | null = null
   private cues: VideoCue[] = []
   private firedCues = new Set<number>()
+  private targetVolume = 0.35
+  private fadingOut = false
+  private volumeRaf: number | null = null
 
   constructor(container: HTMLElement) {
     this.root = document.createElement('div')
@@ -42,9 +45,6 @@ export class VideoOverlay {
     this.placeholder = document.createElement('div')
     this.placeholder.className = 'video-overlay__placeholder'
     this.placeholder.textContent = '🎬 A little memory… (clip coming soon)'
-    const hint = document.createElement('div')
-    hint.className = 'video-overlay__hint'
-    hint.textContent = 'tap to continue'
     // подпись-реплика поверх ролика
     this.caption = document.createElement('div')
     this.caption.className = 'video-overlay__caption'
@@ -52,11 +52,16 @@ export class VideoOverlay {
     this.captionPortrait.alt = ''
     this.captionText = document.createElement('span')
     this.caption.append(this.captionPortrait, this.captionText)
-    this.root.append(this.video, this.placeholder, this.caption, hint)
-    this.root.addEventListener('pointerdown', () => this.end())
+    this.root.append(this.video, this.placeholder, this.caption)
+    // выход — только кнопкой в углу (та же, что в сценах); случайный тап
+    // по экрану ролик не обрывает
+    this.placeholder.addEventListener('pointerdown', () => this.end())
     this.video.addEventListener('ended', () => this.end())
     this.video.addEventListener('error', () => this.showPlaceholder())
-    this.video.addEventListener('timeupdate', () => this.checkCues())
+    this.video.addEventListener('timeupdate', () => {
+      this.checkCues()
+      this.checkTail()
+    })
     container.appendChild(this.root)
   }
 
@@ -67,13 +72,56 @@ export class VideoOverlay {
       this.firedCues.clear()
       this.placeholder.style.display = 'none'
       this.video.style.display = 'block'
+      this.video.classList.remove('is-visible')
+      this.fadingOut = false
+      this.targetVolume = Math.min(1, Math.max(0, opts.volume ?? 0.35))
       this.video.muted = false
-      this.video.volume = Math.min(1, Math.max(0, opts.volume ?? 0.35))
+      this.video.volume = 0
       this.video.src = `/video/${id}.mp4`
-      this.root.classList.add('video-overlay--on')
+      this.root.classList.add('video-overlay--on') // сначала тьма наплывает
       audio.beginVideoAmbience()
-      this.video.play().catch(() => this.showPlaceholder())
+      // ролик стартует, когда экран уже тёмный, и сам проявляется за ~1с
+      window.setTimeout(() => {
+        if (!this.finish) return
+        this.video
+          .play()
+          .then(() => {
+            this.video.classList.add('is-visible')
+            this.rampVolume(this.targetVolume, 1000)
+          })
+          .catch(() => this.showPlaceholder())
+      }, 650)
     })
+  }
+
+  /** Последняя секунда: картинка уходит в чёрное, звук стихает. */
+  private checkTail(): void {
+    const d = this.video.duration
+    if (!isFinite(d) || this.fadingOut) return
+    if (d - this.video.currentTime <= 1.1) {
+      this.fadingOut = true
+      this.video.classList.remove('is-visible')
+      this.rampVolume(0, 900)
+    }
+  }
+
+  /** Плавная громкость родной дорожки (HTMLMediaElement без WebAudio). */
+  private rampVolume(to: number, ms: number): void {
+    if (this.volumeRaf !== null) window.cancelAnimationFrame(this.volumeRaf)
+    const from = this.video.volume
+    const t0 = performance.now()
+    const tick = () => {
+      const k = Math.min(1, (performance.now() - t0) / ms)
+      this.video.volume = from + (to - from) * (k * k * (3 - 2 * k))
+      if (k < 1) this.volumeRaf = window.requestAnimationFrame(tick)
+      else this.volumeRaf = null
+    }
+    tick()
+  }
+
+  /** Прервать снаружи (кнопка выхода / смена сцены). */
+  cancel(): void {
+    if (this.finish) this.end()
   }
 
   private checkCues(): void {
@@ -115,13 +163,18 @@ export class VideoOverlay {
       this.captionTimer = null
     }
     this.caption.classList.remove('video-overlay__caption--on')
+    if (this.volumeRaf !== null) {
+      window.cancelAnimationFrame(this.volumeRaf)
+      this.volumeRaf = null
+    }
+    this.video.classList.remove('is-visible')
     this.root.classList.remove('video-overlay--on')
     this.video.pause()
     this.video.removeAttribute('src')
     audio.endVideoAmbience()
     const done = this.finish
     this.finish = null
-    // даём затухнуть, потом продолжаем сцену
-    if (done) window.setTimeout(done, 450)
+    // даём тьме раствориться, потом продолжаем сцену
+    if (done) window.setTimeout(done, 750)
   }
 }

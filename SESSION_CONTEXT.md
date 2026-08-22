@@ -118,8 +118,11 @@ Stand_and_Chat УБРАН у всех — он разворачивает кор
   clamp забором) в Environment.ts; застревание >0.6с → мягкий стоп.
 - TapRipple — кольцо в точке тапа.
 - ExitButton (слева сверху, виден вне EXPLORE) → story.abort() обеих миссий.
-- VideoOverlay: letterbox, /video/<id>.mp4, нет файла → тёплая заглушка 6с,
-  тап = скип. Action {video, video_volume, cues:[{at, actor, line, voice}]}
+- VideoOverlay: НА ВЕСЬ ЭКРАН (object-fit cover), вход: тьма 0.7с → ролик
+  проявляется 1с + громкость ramp; последняя 1.1с — уход в чёрное; выход —
+  ТОЛЬКО кнопкой ExitButton (z-index 45 поверх оверлея; тап по экрану ролик
+  не обрывает), StoryEngine.invalidatePending → videoOverlay.cancel().
+  /video/<id>.mp4, нет файла → тёплая заглушка 6с (её тап закрывает). Action {video, video_volume, cues:[{at, actor, line, voice}]}
   в story JSON: родная дорожка ролика приглушена (0.3), поверх — микс
   движка: audio.beginVideoAmbience() (основная музыка → 0.03, своя мелодия
   /audio/memory_music.mp3 0.6 — вырезка 1–13с из bg_vide_music.mp3 Артура с

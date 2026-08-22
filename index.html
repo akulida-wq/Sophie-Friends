@@ -322,6 +322,7 @@
         -webkit-tap-highlight-color: transparent;
       }
       .exit-button {
+        z-index: 45; /* поверх кино-вставки — выход всегда доступен */
         position: fixed;
         top: 2.5vh;
         left: 2.5vh;
@@ -332,7 +333,6 @@
         background: rgba(255, 250, 240, 0.9);
         box-shadow: 0 4px 14px rgba(90, 80, 60, 0.16);
         cursor: pointer;
-        z-index: 20;
         display: none;
         align-items: center;
         justify-content: center;
@@ -350,16 +350,23 @@
         justify-content: center;
         opacity: 0;
         pointer-events: none;
-        transition: opacity 0.45s ease;
+        transition: opacity 0.7s ease;
         z-index: 40;
       }
       .video-overlay--on {
         opacity: 1;
         pointer-events: auto;
       }
+      /* на весь экран; сам ролик проявляется из чёрного и в чёрный уходит */
       .video-overlay video {
-        max-width: 100%;
-        max-height: 76vh;
+        width: 100vw;
+        height: 100vh;
+        object-fit: cover;
+        opacity: 0;
+        transition: opacity 1s ease;
+      }
+      .video-overlay video.is-visible {
+        opacity: 1;
       }
       .video-overlay__placeholder {
         width: 100%;
