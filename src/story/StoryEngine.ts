@@ -68,6 +68,9 @@ export class StoryEngine {
   private minigameTimer: number | null = null
   /** Каким предметом ребёнок сыграл в минигре — от него зависят реплики. */
   private lastMinigameProp: string | null = null
+  /** Сцены, чей вопрос уже прозвучал: при повторном показе карточек после
+   *  мягкого редиректа вопрос не повторяем голосом — только надпись. */
+  private readonly promptVoiced = new Set<string>()
   /** Called when a choice is picked; SafetyLayer listens for avoidance. */
   onChoice: ((choiceId: string, redirect: boolean, avoidant: boolean) => void) | null = null
 
@@ -111,6 +114,7 @@ export class StoryEngine {
     this.invalidatePending()
     this.missCounts.clear()
     this.lastMinigameProp = null
+    this.promptVoiced.clear()
     const initialState = this.mission.actors?.bruno?.initial_state ?? 'withdrawn'
     this.deps.brunoView.setState(initialState)
     console.log(`[Story] mission "${this.mission.mission}" started`)
@@ -230,7 +234,10 @@ export class StoryEngine {
       console.log(`[Story] simplified choices for "${scene.id}" -> ${choices.map((c) => c.id).join(', ')}`)
     }
 
-    audio.voice(scene.prompt?.voice)
+    if (!this.promptVoiced.has(scene.id)) {
+      this.promptVoiced.add(scene.id)
+      audio.voice(scene.prompt?.voice)
+    }
     this.deps.choicePanel.show(
       {
         promptIcon: scene.prompt?.icon ? iconFor(scene.prompt.icon) : undefined,
