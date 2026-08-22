@@ -117,8 +117,9 @@ red(0,-0.5) yaw 0.05 (центр, лицом к камере), pink(1.6,0.45) ya
 - VideoOverlay: letterbox, /video/<id>.mp4, нет файла → тёплая заглушка 6с,
   тап = скип. Action {video, video_volume, cues:[{at, actor, line, voice}]}
   в story JSON: родная дорожка ролика приглушена (0.3), поверх — микс
-  движка: audio.beginVideoAmbience() (музыка 0.22, фонтан 0.4, птицы
-  /audio/birds.mp3 0.45 — файла пока нет), реплики по таймкодам с подписью
+  движка: audio.beginVideoAmbience() (основная музыка → 0.03, своя мелодия
+  /audio/memory_music.mp3 0.6 — вырезка 1–13с из bg_vide_music.mp3 Артура с
+  фейдами; фонтан 0.4; птицы 0.45), реплики по таймкодам с подписью
   .video-overlay__caption (портрет говорящего). memory1.mp4 ЕСТЬ (Kling 3.0,
   10с, сгенерирован Артуром; исходник в корне Bring_this_exact_frame…mp4).
 - Вторая миссия memory.json (скамейка): сесть (Софи ОСТАЁТСЯ сидеть —
@@ -200,9 +201,10 @@ rigged + pretty.
   s7_sophie_look_bruno.
 - Клавиша H (и русская Р) прячет HUD (body.hud-hidden, CSS в index.html) —
   для чистых скриншотов-референсов (видео в Higgsfield image-to-video).
-- Ждём от Артура: голоса s7_sophie_look_bruno, m1_sophie_memory_catch,
-  m1_bruno_memory_ball (голос Бруно), m1_sophie_memory_best; звук
-  public/audio/birds.mp3.
+- Птицы: /audio/birds.mp3 (109с, soundreality) — один луп на сессию, в
+  прогулке «вспышки» пения еле слышно (0.07) на 28с каждые 70–130с, на
+  ролике 0.45. Все голоса воспоминания на месте.
+- Ждём от Артура: только голос s7_sophie_look_bruno.
 - Дальше по плану Артура: интерфейс, логика, камера (после визуала).
 - Старые ассеты сохранены (sophie.glb, sophie_meshy.glb, bruno.glb,
   environment.glb) — откат = смена ASSET_* в main.ts.

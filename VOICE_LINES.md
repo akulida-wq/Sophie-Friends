@@ -76,6 +76,4 @@
 - m1_sophie_memory_best (8.0с, Софи) — Best day ever!
 
 ## ЕЩЁ НЕ ЗАПИСАНО (сводка)
-- s7_sophie_look_bruno (финал миссии)
-- m1_sophie_memory_catch, m1_bruno_memory_ball, m1_sophie_memory_best
-- звук: public/audio/birds.mp3 (пение птиц, луп 20–40с, без резких криков)
+- s7_sophie_look_bruno (финал миссии) — единственная недостающая

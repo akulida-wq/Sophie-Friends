@@ -18,9 +18,14 @@ const MASTER_VOLUME = 0.22
 const VOICE_VOLUME = 0.9
 const FOUNTAIN_VOLUME = 0.35 // относительно master (музыка 0.55–0.8); вдвое тише по просьбе Артура
 // микс на время кино-вставки (воспоминание): музыка тише, фонтан и птицы слышны
-const VIDEO_MUSIC_DUCK = 0.22
+const VIDEO_MUSIC_DUCK = 0.03 // основная музыка почти уходит — у ролика своя
 const VIDEO_FOUNTAIN = 0.4
 const VIDEO_BIRDS = 0.45
+const VIDEO_MUSIC = 0.6 // /audio/memory_music.mp3 — мелодия воспоминания
+// птицы в самой игре: еле слышно, время от времени
+const AMBIENT_BIRDS = 0.07
+const AMBIENT_BIRDS_EVERY_MS: [number, number] = [70_000, 130_000]
+const AMBIENT_BIRDS_FOR_MS = 28_000
 const MUTE_KEY = 'sophie_sound_muted'
 
 const STEP = 0.33 // восьмые при ~90 bpm — неторопливо
@@ -115,6 +120,7 @@ class AudioSystem {
       this.buildAmbient()
       void this.startMusicFile()
       void this.startFountainLoop()
+      void this.startBirds()
       this.setMood(this.pendingMood)
     }
     this.applyState()
@@ -187,10 +193,16 @@ class AudioSystem {
   }
 
   private videoAmbience = false
+  /** Птицы: один луп на всю игру; громкость — еле слышно по расписанию,
+   *  в полный (тихий) голос — на время ролика-воспоминания. */
   private birdsGain: GainNode | null = null
-  private birdsSource: AudioBufferSourceNode | null = null
+  private birdsLoaded = false
+  private ambientBirdsOn = false
+  private memoryMusic: AudioBuffer | null = null
+  private memoryMusicSource: AudioBufferSourceNode | null = null
+  private memoryMusicGain: GainNode | null = null
 
-  /** На время кино-вставки: музыка тише, фонтан слышен, птицы поют. */
+  /** На время кино-вставки: своя мелодия, фонтан слышен, птицы поют. */
   beginVideoAmbience(): void {
     this.videoAmbience = true
     const ctx = this.ctx
@@ -198,7 +210,8 @@ class AudioSystem {
     const t = ctx.currentTime
     if (this.musicGain) this.musicGain.gain.setTargetAtTime(VIDEO_MUSIC_DUCK, t, 0.6)
     if (this.fountainGain) this.fountainGain.gain.setTargetAtTime(VIDEO_FOUNTAIN, t, 0.8)
-    void this.startBirds()
+    if (this.birdsGain) this.birdsGain.gain.setTargetAtTime(VIDEO_BIRDS, t, 1.2)
+    void this.playMemoryMusic()
   }
 
   endVideoAmbience(): void {
@@ -208,25 +221,52 @@ class AudioSystem {
     const t = ctx.currentTime
     this.setMood(this.pendingMood) // музыка возвращается к уровню сцены
     if (this.fountainGain) this.fountainGain.gain.setTargetAtTime(this.fountainTarget, t, 0.8)
-    if (this.birdsGain && this.birdsSource) {
-      const g = this.birdsGain
-      const s = this.birdsSource
-      g.gain.setTargetAtTime(0, t, 0.5)
-      s.stop(t + 2.5)
-      this.birdsGain = null
-      this.birdsSource = null
+    if (this.birdsGain) {
+      this.birdsGain.gain.setTargetAtTime(this.ambientBirdsOn ? AMBIENT_BIRDS : 0, t, 0.8)
+    }
+    if (this.memoryMusicGain && this.memoryMusicSource) {
+      this.memoryMusicGain.gain.setTargetAtTime(0, t, 0.5)
+      this.memoryMusicSource.stop(t + 2.5)
+      this.memoryMusicSource = null
+      this.memoryMusicGain = null
     }
   }
 
-  /** Птицы: /audio/birds.mp3 лупом, только на время ролика; нет файла — тишина. */
+  /** Мелодия воспоминания (/audio/memory_music.mp3, ~12с, уже с фейдами). */
+  private async playMemoryMusic(): Promise<void> {
+    const ctx = this.ctx
+    if (!ctx || !this.master) return
+    try {
+      if (!this.memoryMusic) {
+        const res = await fetch('/audio/memory_music.mp3')
+        if (!res.ok) throw new Error(String(res.status))
+        this.memoryMusic = await ctx.decodeAudioData(await res.arrayBuffer())
+      }
+      if (!this.videoAmbience || this.memoryMusicSource) return
+      const gain = ctx.createGain()
+      gain.gain.value = VIDEO_MUSIC
+      gain.connect(this.master)
+      const src = ctx.createBufferSource()
+      src.buffer = this.memoryMusic
+      src.connect(gain)
+      src.start()
+      this.memoryMusicSource = src
+      this.memoryMusicGain = gain
+    } catch {
+      console.log('[Audio] no memory_music.mp3 — clip plays over the main track')
+    }
+  }
+
+  /** Птицы: /audio/birds.mp3 лупом на всю сессию (стартует беззвучно);
+   *  расписание еле слышных «вспышек» пения в свободной прогулке. */
   private async startBirds(): Promise<void> {
     const ctx = this.ctx
-    if (!ctx || !this.master || this.birdsSource) return
+    if (!ctx || !this.master || this.birdsLoaded) return
+    this.birdsLoaded = true
     try {
       const res = await fetch('/audio/birds.mp3')
       if (!res.ok) throw new Error(String(res.status))
       const buf = await ctx.decodeAudioData(await res.arrayBuffer())
-      if (!this.videoAmbience) return // ролик уже кончился, пока грузили
       const gain = ctx.createGain()
       gain.gain.value = 0
       gain.connect(this.master)
@@ -235,12 +275,32 @@ class AudioSystem {
       src.loop = true
       src.connect(gain)
       src.start()
-      gain.gain.setTargetAtTime(VIDEO_BIRDS, ctx.currentTime, 1.2)
       this.birdsGain = gain
-      this.birdsSource = src
+      if (this.videoAmbience) gain.gain.setTargetAtTime(VIDEO_BIRDS, ctx.currentTime, 1.2)
+      this.scheduleAmbientBirds()
+      console.log('[Audio] birds.mp3 ready (ambient + memory clip)')
     } catch {
-      console.log('[Audio] no birds.mp3 — memory clip without birds')
+      console.log('[Audio] no birds.mp3 — no bird song')
     }
+  }
+
+  private scheduleAmbientBirds(): void {
+    const [lo, hi] = AMBIENT_BIRDS_EVERY_MS
+    const wait = lo + Math.random() * (hi - lo)
+    window.setTimeout(() => {
+      const ctx = this.ctx
+      if (ctx && this.birdsGain) {
+        this.ambientBirdsOn = true
+        if (!this.videoAmbience) this.birdsGain.gain.setTargetAtTime(AMBIENT_BIRDS, ctx.currentTime, 2.5)
+        window.setTimeout(() => {
+          this.ambientBirdsOn = false
+          if (this.ctx && this.birdsGain && !this.videoAmbience) {
+            this.birdsGain.gain.setTargetAtTime(0, this.ctx.currentTime, 3)
+          }
+        }, AMBIENT_BIRDS_FOR_MS)
+      }
+      this.scheduleAmbientBirds()
+    }, wait)
   }
 
   /** Расстояние Софи до фонтана (м) → громкость журчания: полная в 2 м,
