@@ -71,7 +71,4 @@
 - p_chalk_already — We already drew a sun here! Let's save the chalk for another day.
 
 ## ЕЩЁ НЕ ЗАПИСАНО (сводка)
-- s7_sophie_look_bruno
-- p_fountain_drink, p_fountain_full
-- s6_sophie_oops_ball, s6_sophie_oops_blocks, s6_sophie_oops_chalk
-- p_chalk_later, p_chalk_drawn, p_chalk_already
+- s7_sophie_look_bruno (финал миссии — единственная недостающая)

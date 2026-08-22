@@ -445,6 +445,12 @@ async function bootWorld(): Promise<void> {
   let lastDrinkAt = -DRINK_COOLDOWN_MS
   const fountainInteractNode = game.scene.getObjectByName('Fountain')
   if (fountainInteractNode) {
+    // журчание громче по мере приближения Софи (позиционный звук)
+    const fountainPos = fountainInteractNode.getWorldPosition(new THREE.Vector3())
+    fountainPos.y = 0
+    game.addUpdatable(() => {
+      audio.setFountainProximity(game.sophie.position.distanceTo(fountainPos))
+    })
     interaction.add({
       id: 'fountain',
       object: fountainInteractNode,

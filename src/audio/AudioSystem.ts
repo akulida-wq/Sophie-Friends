@@ -16,6 +16,7 @@ type UiSound = 'tap' | 'card' | 'cue' | 'reward'
 
 const MASTER_VOLUME = 0.22
 const VOICE_VOLUME = 0.9
+const FOUNTAIN_VOLUME = 0.7 // относительно master (музыка 0.55–0.8)
 const MUTE_KEY = 'sophie_sound_muted'
 
 const STEP = 0.33 // восьмые при ~90 bpm — неторопливо
@@ -49,6 +50,9 @@ class AudioSystem {
   private step = 0
   private musicGain: GainNode | null = null
   private musicLoaded = false
+  /** Журчание фонтана: луп, громкость ведёт расстояние до Софи. */
+  private fountainGain: GainNode | null = null
+  private fountainTarget = 0
 
   constructor() {
     this.muted = localStorage.getItem(MUTE_KEY) === '1'
@@ -106,6 +110,7 @@ class AudioSystem {
       this.started = true
       this.buildAmbient()
       void this.startMusicFile()
+      void this.startFountainLoop()
       this.setMood(this.pendingMood)
     }
     this.applyState()
@@ -149,6 +154,43 @@ class AudioSystem {
     } catch {
       console.log('[Audio] no music.mp3 — falling back to music box')
       this.startScheduler()
+    }
+  }
+
+  /** Фонтан: /audio/fountain.mp3 лупом, стартует беззвучно — громкость
+   *  задаёт setFountainProximity (ближе — громче, вдали не слышно). */
+  private async startFountainLoop(): Promise<void> {
+    const ctx = this.ctx
+    if (!ctx || !this.master) return
+    try {
+      const res = await fetch('/audio/fountain.mp3')
+      if (!res.ok) throw new Error(String(res.status))
+      const buf = await ctx.decodeAudioData(await res.arrayBuffer())
+      this.fountainGain = ctx.createGain()
+      this.fountainGain.gain.value = 0
+      this.fountainGain.connect(this.master)
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.loop = true
+      src.connect(this.fountainGain)
+      src.start()
+      // применить уже известное расстояние без скачка
+      this.fountainGain.gain.setTargetAtTime(this.fountainTarget, ctx.currentTime, 0.6)
+      console.log('[Audio] fountain.mp3 looping (positional)')
+    } catch {
+      console.log('[Audio] no fountain.mp3 — fountain is silent')
+    }
+  }
+
+  /** Расстояние Софи до фонтана (м) → громкость журчания: полная в 2 м,
+   *  тишина дальше ~13 м; сглаживание ~0.3с — никаких скачков. */
+  setFountainProximity(distance: number): void {
+    const t = Math.min(1, Math.max(0, 1 - (distance - 2) / 11))
+    const v = t * t * FOUNTAIN_VOLUME
+    if (Math.abs(v - this.fountainTarget) < 0.002) return
+    this.fountainTarget = v
+    if (this.ctx && this.fountainGain) {
+      this.fountainGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.3)
     }
   }
 

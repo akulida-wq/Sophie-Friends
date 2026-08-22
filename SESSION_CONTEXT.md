@@ -180,9 +180,14 @@ rigged + pretty.
   Multilingual v2, speed 0.78, stability 65, similarity 85, style 25,
   speaker boost on (полностью — в VOICE_LINES.md). Голос Бруно — не
   зафиксирован.
-- Ждём от Артура: public/video/memory1.mp4; озвучка — см. раздел
-  «ЕЩЁ НЕ ЗАПИСАНО» в VOICE_LINES.md; звуки public/assets/sfx/drink.mp3
-  и chalk.mp3.
+- Звуки: /audio/fountain.mp3 — позиционный луп (AudioSystem.
+  setFountainProximity по дистанции Софи: полная в 2 м, тишина за 13 м,
+  setTargetAtTime 0.3с); sfx/drink.mp3 — вырезка 2.7с из
+  «sound_garage-dog-drinking-water» (python: фейды+lowpass 5кГц+норм 0.62,
+  mp3 через Blender VSE mixdown — tools/blender/encode_mp3.py; ffmpeg в системе
+  НЕТ); sfx/chalk.mp3 от Артура. Голоса: все новые id на месте, кроме
+  s7_sophie_look_bruno.
+- Ждём от Артура: public/video/memory1.mp4; голос s7_sophie_look_bruno.
 - Дальше по плану Артура: интерфейс, логика, камера (после визуала).
 - Старые ассеты сохранены (sophie.glb, sophie_meshy.glb, bruno.glb,
   environment.glb) — откат = смена ASSET_* в main.ts.
