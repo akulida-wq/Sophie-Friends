@@ -16,7 +16,7 @@ type UiSound = 'tap' | 'card' | 'cue' | 'reward'
 
 const MASTER_VOLUME = 0.22
 const VOICE_VOLUME = 0.9
-const FOUNTAIN_VOLUME = 0.7 // относительно master (музыка 0.55–0.8)
+const FOUNTAIN_VOLUME = 0.35 // относительно master (музыка 0.55–0.8); вдвое тише по просьбе Артура
 const MUTE_KEY = 'sophie_sound_muted'
 
 const STEP = 0.33 // восьмые при ~90 bpm — неторопливо

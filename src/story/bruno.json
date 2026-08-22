@@ -451,7 +451,8 @@
       "actions": [
         {
           "actor": "bruno",
-          "anim": "TryAgainSucceed"
+          "anim": "IdleOpen",
+          "note": "success without the jump — open, lively stance"
         },
         {
           "actor": "friends",
@@ -477,8 +478,8 @@
         },
         {
           "actor": "bruno",
-          "anim": "TryAgainSucceed",
-          "note": "co-regulated success with Sophie beside"
+          "anim": "IdleOpen",
+          "note": "co-regulated success with Sophie beside (no jump)"
         },
         {
           "actor": "sophie",

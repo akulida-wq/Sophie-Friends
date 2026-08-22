@@ -69,7 +69,20 @@ const videoOverlay = new VideoOverlay(document.body)
 new PauseOverlay(document.body, game)
 new SoundToggle(document.body)
 
-controller.tapInterceptor = (raycaster) => interaction.tryActivate(raycaster)
+// Тап по Бруно: если Софи не стоит у него перед лицом — сначала подбегает
+// на точку напротив (даже если формально уже «в радиусе»), потом разговор
+controller.tapInterceptor = (raycaster) => {
+  const item = interaction.findTapped(raycaster)
+  if (item?.id === 'bruno' && game.states.is('EXPLORE')) {
+    const front = brunoFrontPoint()
+    if (game.sophie.position.distanceTo(front) > 0.7) {
+      audio.ui('tap')
+      controller.goToInteract('bruno', front, 0.2)
+      return true
+    }
+  }
+  return interaction.tryActivate(raycaster)
+}
 // Точка «напротив Бруно»: подходим к его лицу, с какой бы стороны ни шли
 function brunoFrontPoint(): THREE.Vector3 {
   const p = new THREE.Vector3()
