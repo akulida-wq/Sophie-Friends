@@ -271,7 +271,7 @@ const COLL_CIRCLES: [number, number, number][] = [
 ]
 const COLL_RECTS: [number, number, number, number][] = [
   [6.9, 13.5, -5.9, -0.1], // дом
-  [-4.5, 5.2, 10.5, 13.3], // сад-клумба: цветы не топчем
+  // сад-клумба проходима: Софи бегает сквозь цветы (просьба Артура)
 ]
 
 export function resolveYardCollisions(pos: THREE.Vector3): void {
