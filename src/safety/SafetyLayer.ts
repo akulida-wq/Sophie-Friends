@@ -2,8 +2,14 @@ import type { Game } from '../core/Game'
 import type { InteractionSystem } from '../interaction/InteractionSystem'
 import type { SophieBubble } from '../dialogue/SophieBubble'
 import type { StoryEngine } from '../story/StoryEngine'
+import { audio } from '../audio/AudioSystem'
 
-const DEFAULT_IDLE_HINT = 'A little step is enough.'
+/** Подсказка при бездействии: текст/голос задаёт main из props.json;
+ *  null = подсказывать нечего (после знакомства с Бруно гуляем свободно). */
+export type IdleHint = { line: string; voice?: string; target?: string } | null
+
+const IDLE_HINT_SEC = 30
+const IDLE_HINT_MAX_PER_SESSION = 3
 
 /**
  * Sophie's support logic (never punitive):
@@ -18,6 +24,9 @@ export class SafetyLayer {
   private idleSeconds = 0
   private avoidStreak = 0
   private hintShown = false
+  private hintsGiven = 0
+  /** Что сказать при бездействии (ставит main; null — молчим). */
+  idleHint: () => IdleHint = () => null
 
   constructor(
     private readonly game: Game,
@@ -44,18 +53,28 @@ export class SafetyLayer {
     }
 
     this.idleSeconds += dt
-    if (!this.hintShown && this.idleSeconds >= this.story.safetyConfig.idle_hint_sec) {
+    if (
+      !this.hintShown &&
+      this.hintsGiven < IDLE_HINT_MAX_PER_SESSION &&
+      this.idleSeconds >= IDLE_HINT_SEC
+    ) {
       this.hintShown = true
       this.showIdleHint()
     }
   }
 
   private showIdleHint(): void {
-    // Highlight the nearest interactable — one gentle suggestion, no pressure.
-    const nearest = this.interaction.nearest()
-    if (nearest) this.interaction.setHint(nearest)
-    console.log(`[Safety] idle hint (highlight: ${nearest?.id ?? 'none'})`)
-    this.bubble.say(DEFAULT_IDLE_HINT)
+    const hint = this.idleHint()
+    if (!hint || audio.isVoicePlaying) return
+    this.hintsGiven++
+    // Подсветить, к кому идти — одна мягкая подсказка, без давления.
+    const target = hint.target
+      ? this.interaction.list().find((i) => i.id === hint.target) ?? null
+      : this.interaction.nearest()
+    if (target) this.interaction.setHint(target)
+    console.log(`[Safety] idle hint ${this.hintsGiven}/${IDLE_HINT_MAX_PER_SESSION} (highlight: ${target?.id ?? 'none'})`)
+    audio.voice(hint.voice)
+    void this.bubble.say(hint.line)
   }
 
   private onChoice(avoidant: boolean): void {

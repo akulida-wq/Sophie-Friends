@@ -235,6 +235,10 @@ game.addUpdatable(() => exitButton.setVisible(!game.states.is('EXPLORE')))
 
 const safety = new SafetyLayer(game, interaction, bubble, story)
 controller.onInput = () => safety.notifyActivity()
+// бездействие: до знакомства с Бруно — подсказать дорогу к нему; после —
+// свободная прогулка без подсказок
+safety.idleHint = () =>
+  brunoMet ? null : { ...PROPS_CONTENT.locked, target: 'bruno' }
 
 interaction.add({
   id: 'bruno',
