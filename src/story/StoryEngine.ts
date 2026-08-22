@@ -405,7 +405,9 @@ export class StoryEngine {
       if (action.video) {
         console.log(`[Cinematic] video insert: ${action.video}`)
         if (this.deps.videoOverlay) {
-          this.deps.videoOverlay.play(action.video).then(() => {
+          this.deps.videoOverlay
+            .play(action.video, { volume: action.video_volume, cues: action.cues })
+            .then(() => {
             if (gen === this.generation) step()
           })
         } else {

@@ -13,9 +13,20 @@ export interface MoodSpec {
 }
 
 /** One staged step inside a scene — heterogeneous by design. */
+export interface VideoCue {
+  at: number
+  actor?: string
+  line: string
+  voice?: string
+}
+
 export interface StoryAction {
   /** Кино-вставка: id ролика из /video/<id>.mp4 */
   video?: string
+  /** Громкость родной дорожки ролика 0..1 (по умолчанию 0.35). */
+  video_volume?: number
+  /** Реплики поверх ролика по таймкоду (сек): голос + подпись. */
+  cues?: VideoCue[]
   actor?: string
   anim?: string
   line?: string

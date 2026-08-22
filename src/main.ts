@@ -586,6 +586,7 @@ declare global {
       mood: Mood
       story: StoryEngine
       safety: SafetyLayer
+      videoOverlay: VideoOverlay
     }
   }
 }
@@ -603,4 +604,5 @@ window.sophieDebug = {
   mood,
   story,
   safety,
+  videoOverlay,
 }

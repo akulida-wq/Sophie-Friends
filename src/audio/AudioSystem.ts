@@ -17,6 +17,10 @@ type UiSound = 'tap' | 'card' | 'cue' | 'reward'
 const MASTER_VOLUME = 0.22
 const VOICE_VOLUME = 0.9
 const FOUNTAIN_VOLUME = 0.35 // относительно master (музыка 0.55–0.8); вдвое тише по просьбе Артура
+// микс на время кино-вставки (воспоминание): музыка тише, фонтан и птицы слышны
+const VIDEO_MUSIC_DUCK = 0.22
+const VIDEO_FOUNTAIN = 0.4
+const VIDEO_BIRDS = 0.45
 const MUTE_KEY = 'sophie_sound_muted'
 
 const STEP = 0.33 // восьмые при ~90 bpm — неторопливо
@@ -182,6 +186,63 @@ class AudioSystem {
     }
   }
 
+  private videoAmbience = false
+  private birdsGain: GainNode | null = null
+  private birdsSource: AudioBufferSourceNode | null = null
+
+  /** На время кино-вставки: музыка тише, фонтан слышен, птицы поют. */
+  beginVideoAmbience(): void {
+    this.videoAmbience = true
+    const ctx = this.ctx
+    if (!ctx) return
+    const t = ctx.currentTime
+    if (this.musicGain) this.musicGain.gain.setTargetAtTime(VIDEO_MUSIC_DUCK, t, 0.6)
+    if (this.fountainGain) this.fountainGain.gain.setTargetAtTime(VIDEO_FOUNTAIN, t, 0.8)
+    void this.startBirds()
+  }
+
+  endVideoAmbience(): void {
+    this.videoAmbience = false
+    const ctx = this.ctx
+    if (!ctx) return
+    const t = ctx.currentTime
+    this.setMood(this.pendingMood) // музыка возвращается к уровню сцены
+    if (this.fountainGain) this.fountainGain.gain.setTargetAtTime(this.fountainTarget, t, 0.8)
+    if (this.birdsGain && this.birdsSource) {
+      const g = this.birdsGain
+      const s = this.birdsSource
+      g.gain.setTargetAtTime(0, t, 0.5)
+      s.stop(t + 2.5)
+      this.birdsGain = null
+      this.birdsSource = null
+    }
+  }
+
+  /** Птицы: /audio/birds.mp3 лупом, только на время ролика; нет файла — тишина. */
+  private async startBirds(): Promise<void> {
+    const ctx = this.ctx
+    if (!ctx || !this.master || this.birdsSource) return
+    try {
+      const res = await fetch('/audio/birds.mp3')
+      if (!res.ok) throw new Error(String(res.status))
+      const buf = await ctx.decodeAudioData(await res.arrayBuffer())
+      if (!this.videoAmbience) return // ролик уже кончился, пока грузили
+      const gain = ctx.createGain()
+      gain.gain.value = 0
+      gain.connect(this.master)
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.loop = true
+      src.connect(gain)
+      src.start()
+      gain.gain.setTargetAtTime(VIDEO_BIRDS, ctx.currentTime, 1.2)
+      this.birdsGain = gain
+      this.birdsSource = src
+    } catch {
+      console.log('[Audio] no birds.mp3 — memory clip without birds')
+    }
+  }
+
   /** Расстояние Софи до фонтана (м) → громкость журчания: полная в 2 м,
    *  тишина дальше ~13 м; сглаживание ~0.3с — никаких скачков. */
   setFountainProximity(distance: number): void {
@@ -189,7 +250,7 @@ class AudioSystem {
     const v = t * t * FOUNTAIN_VOLUME
     if (Math.abs(v - this.fountainTarget) < 0.002) return
     this.fountainTarget = v
-    if (this.ctx && this.fountainGain) {
+    if (this.ctx && this.fountainGain && !this.videoAmbience) {
       this.fountainGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.3)
     }
   }

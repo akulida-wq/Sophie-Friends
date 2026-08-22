@@ -70,5 +70,12 @@
 - p_chalk_drawn — A sunny sun for everyone who walks by!
 - p_chalk_already — We already drew a sun here! Let's save the chalk for another day.
 
+## Реплики ПОВЕРХ видео-воспоминания (memory1.mp4, таймкоды в memory.json)
+- m1_sophie_memory_catch (0.8с, Софи) — Catch me, Bruno! Over here!
+- m1_bruno_memory_ball (4.6с, БРУНО — его голос!) — Here it comes, Sophie!
+- m1_sophie_memory_best (8.0с, Софи) — Best day ever!
+
 ## ЕЩЁ НЕ ЗАПИСАНО (сводка)
-- s7_sophie_look_bruno (финал миссии — единственная недостающая)
+- s7_sophie_look_bruno (финал миссии)
+- m1_sophie_memory_catch, m1_bruno_memory_ball, m1_sophie_memory_best
+- звук: public/audio/birds.mp3 (пение птиц, луп 20–40с, без резких криков)

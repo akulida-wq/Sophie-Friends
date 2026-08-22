@@ -61,7 +61,28 @@
       "camera": "follow_sophie",
       "actions": [
         {
-          "video": "memory1"
+          "video": "memory1",
+          "video_volume": 0.3,
+          "cues": [
+            {
+              "at": 0.8,
+              "actor": "sophie",
+              "line": "Catch me, Bruno! Over here!",
+              "voice": "m1_sophie_memory_catch"
+            },
+            {
+              "at": 4.6,
+              "actor": "bruno",
+              "line": "Here it comes, Sophie!",
+              "voice": "m1_bruno_memory_ball"
+            },
+            {
+              "at": 8.0,
+              "actor": "sophie",
+              "line": "Best day ever!",
+              "voice": "m1_sophie_memory_best"
+            }
+          ]
         },
         {
           "actor": "sophie",
