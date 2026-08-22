@@ -1,8 +1,16 @@
 # Озвучка — ElevenLabs
 
 Каждую реплику сохранить как `public/assets/voice/<имя>.mp3` (имя = id ниже).
-Голос Софи — один на все её реплики (тёплый, детский, скорость ~0.9).
-У Бруно ОДНА реплика — отдельный голос (ниже, мягкий, чуть застенчивый).
+
+## НАСТРОЙКИ ГОЛОСА СОФИ (ElevenLabs, зафиксировано 2026-08-22)
+- Voice: **Tilly — Bright, Spirited, Naive, Scrappy**
+- Model: Eleven Multilingual v2
+- Speed 0.78 · Stability 65% · Similarity boost 85% · Style 25% · Speaker boost: on
+- В History у любой реплики Софи есть кнопка «Restore voice & settings» —
+  жми её перед записью новых фраз, чтобы тембр не гулял.
+
+У Бруно ОДНА реплика — отдельный голос (ниже, мягкий, чуть застенчивый);
+имя голоса Бруно — посмотреть в History у `s7_bruno_not_alone`.
 
 ## СОФИ — миссия с Бруно
 - s1_sophie_far_away — Hi, Bruno. You look a little far away today.

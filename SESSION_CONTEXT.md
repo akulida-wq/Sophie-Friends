@@ -176,8 +176,10 @@ rigged + pretty.
 - Финал миссии: реплика s7_sophie_look_bruno («Look — Bruno is playing
   with everyone now!...»), end-menu: Keep exploring the yard / Play again /
   Visit another friend later.
-- Голос Софи в ElevenLabs — имя НЕ зафиксировано (советовал Matilda/Hope/
-  Jessica); спросить Артура и записать сюда.
+- Голос Софи в ElevenLabs: Tilly (Bright, Spirited, Naive, Scrappy),
+  Multilingual v2, speed 0.78, stability 65, similarity 85, style 25,
+  speaker boost on (полностью — в VOICE_LINES.md). Голос Бруно — не
+  зафиксирован.
 - Ждём от Артура: public/video/memory1.mp4; озвучка — см. раздел
   «ЕЩЁ НЕ ЗАПИСАНО» в VOICE_LINES.md; звуки public/assets/sfx/drink.mp3
   и chalk.mp3.
