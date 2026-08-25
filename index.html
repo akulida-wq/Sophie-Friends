@@ -409,11 +409,11 @@
         opacity: 1;
         pointer-events: auto;
       }
-      /* на весь экран БЕЗ кропа (contain): поля — мягкая тьма оверлея */
+      /* на весь экран без чёрных полос (cover; края могут слегка кропнуться) */
       .video-overlay video {
         width: 100vw;
         height: 100vh;
-        object-fit: contain;
+        object-fit: cover;
         opacity: 0;
         transition: opacity 1s ease;
       }

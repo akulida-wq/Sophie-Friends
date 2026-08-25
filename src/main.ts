@@ -459,6 +459,7 @@ async function bootWorld(): Promise<void> {
   // фонтан: Софи подходит и пьёт воду (повторно — не раньше чем через 2 мин)
   const DRINK_COOLDOWN_MS = 120_000
   let lastDrinkAt = -DRINK_COOLDOWN_MS
+  let drinkBusyUntil = 0 // пока идёт сама сцена питья — тапы молчат
   const fountainInteractNode = game.scene.getObjectByName('Fountain')
   if (fountainInteractNode) {
     // журчание громче по мере приближения Софи (позиционный звук)
@@ -473,6 +474,7 @@ async function bootWorld(): Promise<void> {
       triggerRadius: 2.9,
       onActivate: () => {
         if (!game.states.is('EXPLORE') || audio.isVoicePlaying) return
+        if (performance.now() < drinkBusyUntil) return // уже пьёт — не перебиваем
         // мордой к воде
         const fp = new THREE.Vector3()
         fountainInteractNode.getWorldPosition(fp)
@@ -489,6 +491,7 @@ async function bootWorld(): Promise<void> {
           return
         }
         lastDrinkAt = performance.now()
+        drinkBusyUntil = performance.now() + 5600
         // «пьёт»: нос к воде (Sniff) + журчание, потом довольное виляние
         sophieView.play('Sniff')
         audio.sfx('drink', 0.3)

@@ -71,6 +71,8 @@ export class StoryEngine {
   /** Сцены, чей вопрос уже прозвучал: при повторном показе карточек после
    *  мягкого редиректа вопрос не повторяем голосом — только надпись. */
   private readonly promptVoiced = new Set<string>()
+  /** После мягкого редиректа следующий вопрос показываем молча (надпись). */
+  private muteNextPrompt = false
   /** Called when a choice is picked; SafetyLayer listens for avoidance. */
   onChoice: ((choiceId: string, redirect: boolean, avoidant: boolean) => void) | null = null
 
@@ -115,6 +117,7 @@ export class StoryEngine {
     this.missCounts.clear()
     this.lastMinigameProp = null
     this.promptVoiced.clear()
+    this.muteNextPrompt = false
     const initialState = this.mission.actors?.bruno?.initial_state ?? 'withdrawn'
     this.deps.brunoView.setState(initialState)
     console.log(`[Story] mission "${this.mission.mission}" started`)
@@ -234,7 +237,9 @@ export class StoryEngine {
       console.log(`[Story] simplified choices for "${scene.id}" -> ${choices.map((c) => c.id).join(', ')}`)
     }
 
-    if (!this.promptVoiced.has(scene.id)) {
+    const muted = this.muteNextPrompt
+    this.muteNextPrompt = false
+    if (!muted && !this.promptVoiced.has(scene.id)) {
       this.promptVoiced.add(scene.id)
       audio.voice(scene.prompt?.voice)
     }
@@ -270,6 +275,9 @@ export class StoryEngine {
     if (choice.redirect && !choice.avoidant) {
       this.missCounts.set(scene.id, (this.missCounts.get(scene.id) ?? 0) + 1)
     }
+    // «неправильный» выбор: Софи отвечает репликой, а следующий вопрос
+    // (тот же или мягкой ветки) уже не озвучиваем — только надпись
+    if (choice.redirect || choice.avoidant) this.muteNextPrompt = true
     if (choice.bruno_state) this.deps.brunoView.setState(choice.bruno_state)
 
     this.onChoice?.(choice.id, choice.redirect === true, choice.avoidant === true)
