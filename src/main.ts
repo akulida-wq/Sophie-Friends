@@ -19,8 +19,9 @@ import {
 import { BrunoView } from './interaction/BrunoView'
 import { FriendView } from './interaction/FriendView'
 import { ChalkDrawing } from './interaction/ChalkDrawing'
+import { LoadingScreen } from './dialogue/LoadingScreen'
 import { TapRipple } from './interaction/TapRipple'
-import { VideoOverlay } from './dialogue/VideoOverlay'
+import { VideoOverlay, preloadVideo } from './dialogue/VideoOverlay'
 import { ExitButton } from './safety/ExitButton'
 import { ChoicePanel } from './dialogue/ChoicePanel'
 import { SophieBubble } from './dialogue/SophieBubble'
@@ -48,10 +49,11 @@ const container = document.getElementById('app')
 if (!container) throw new Error('Missing #app container')
 
 const game = new Game(container)
+const loading = new LoadingScreen(document.body)
 
 const controller = new SophieController(game)
 const sophieView = new SophieView(game.sophie)
-sophieView.load(ASSET_SOPHIE, 0) // async; капсула остаётся при неудаче
+void loading.track(sophieView.load(ASSET_SOPHIE, 0), 1.5) // капсула остаётся при неудаче
 controller.onAnimChange = (state) => sophieView.play(state)
 const followCamera = new FollowCamera(game.camera, game.sophie)
 const cinematicCamera = new CinematicCamera(game.camera)
@@ -120,7 +122,7 @@ bruno.position.set(-3, 0, -8)
 bruno.rotation.y = Math.PI / 6
 game.scene.add(bruno)
 const brunoView = new BrunoView(bruno)
-void brunoView.load(ASSET_BRUNO, 0).then((ok) => {
+void loading.track(brunoView.load(ASSET_BRUNO, 0), 1.5).then((ok) => {
   // glow должен светить GLB-модель, а не снятый плейсхолдер
   if (ok) interaction.invalidate('bruno')
 })
@@ -157,7 +159,7 @@ for (const spec of FRIEND_SPECS) {
   anchor.position.set(spec.offset[0], 0, spec.offset[1])
   friends.add(anchor)
   const view = new FriendView(anchor, spec.height)
-  friendLoads.push(view.load(spec.url, spec.yaw))
+  friendLoads.push(loading.track(view.load(spec.url, spec.yaw), 0.5))
   friendViews.push(view)
 }
 // свечение интерактива должно светить настоящие модели, не пустую группу
@@ -520,7 +522,10 @@ async function bootWorld(): Promise<void> {
   }
 }
 
-void bootWorld()
+void loading.track(bootWorld(), 6).then(() => {
+  // ролик воспоминания качаем заранее и в фоне — чтобы не стримился с лагами
+  void preloadVideo('memory1')
+})
 
 game.addUpdatable((dt) => controller.update(dt))
 game.addUpdatable((dt) => sophieView.update(dt))

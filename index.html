@@ -341,6 +341,58 @@
       .exit-button--on { display: flex; }
 
       /* --- Кино-вставка: мягкий letterbox --- */
+      .loading-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2.6vh;
+        background: linear-gradient(165deg, #bfe3f7 0%, #dff0d8 55%, #f7ecd2 100%);
+        transition: opacity 0.8s ease;
+      }
+      .loading-screen--done {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .loading-screen__portrait {
+        width: 16vh;
+        height: 16vh;
+        border-radius: 50%;
+        box-shadow: 0 1.2vh 4vh rgba(90, 70, 40, 0.25);
+        animation: loading-bob 2.4s ease-in-out infinite;
+      }
+      @keyframes loading-bob {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-1.2vh); }
+      }
+      .loading-screen__title {
+        font-size: 4.2vh;
+        font-weight: 800;
+        color: #5a4a34;
+        letter-spacing: 0.02em;
+      }
+      .loading-screen__track {
+        width: min(52vh, 70vw);
+        height: 2.2vh;
+        border-radius: 2vh;
+        background: rgba(255, 255, 255, 0.55);
+        overflow: hidden;
+        box-shadow: inset 0 0.2vh 0.6vh rgba(90, 70, 40, 0.18);
+      }
+      .loading-screen__bar {
+        height: 100%;
+        width: 0%;
+        border-radius: 2vh;
+        background: linear-gradient(90deg, #ffd45e, #ff9d5c);
+      }
+      .loading-screen__hint {
+        font-size: 2vh;
+        color: rgba(90, 74, 52, 0.75);
+      }
+
       .video-overlay {
         position: fixed;
         inset: 0;

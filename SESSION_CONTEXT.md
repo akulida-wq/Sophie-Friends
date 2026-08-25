@@ -106,6 +106,16 @@ Stand_and_Chat УБРАН у всех — он разворачивает кор
 (scratchpad sheet.py) — смотреть ВСЕ кадры клипа, не один.
 
 ## Движок — что добавлено поверх фаз
+- Деплой: github.com/akulida-wq/Sophie-Friends (private, ветка main, SSH) →
+  Vercel https://sophie-friends.vercel.app (авто-деплой на пуш; Vite/dist).
+- LoadingScreen (dialogue/): портрет Софи + плавная полоска; вехи через
+  loading.track(promise, weight): мир 6, Софи/Бруно по 1.5, друзья по 0.5.
+- core/perf.ts: LITE-режим (iOS/маломощные: dpr<=1.3, тени ВЫКЛ, трава
+  1800) — старый iPad душили ретина+теневой проход.
+- Видео: memory1.mp4 пережат Blender'ом до 720p ~9МБ
+  (tools/blender/encode_video.py; Blender 5: media_type='VIDEO' до
+  file_format='FFMPEG'); preloadVideo(id) качает блоб после загрузки мира —
+  ролик не стримится во время показа.
 - Очередь кликов: тап по объекту издалека → Софи идёт (goToInteract) →
   активация по прибытии; к Бруно — ВСЕГДА точка ПЕРЕД лицом (brunoFrontPoint,
   tapInterceptor перехватывает тап даже в радиусе: если Софи дальше 0.7 м от

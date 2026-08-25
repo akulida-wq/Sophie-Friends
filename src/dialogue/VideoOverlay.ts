@@ -6,6 +6,22 @@ const PORTRAITS: Record<string, string> = {
   bruno: '/ui/portrait_bruno.png?v=2',
 }
 
+/** id ролика -> objectURL предзагруженного блоба (грузим после мира). */
+const PRELOADED = new Map<string, string>()
+
+/** Тихо скачать ролик заранее, чтобы он не стримился во время показа. */
+export async function preloadVideo(id: string): Promise<void> {
+  if (PRELOADED.has(id)) return
+  try {
+    const res = await fetch(`/video/${id}.mp4`)
+    if (!res.ok) return
+    PRELOADED.set(id, URL.createObjectURL(await res.blob()))
+    console.log(`[Video] preloaded ${id}`)
+  } catch {
+    /* нет сети/файла — сыграем стримом как раньше */
+  }
+}
+
 export interface VideoPlayOptions {
   /** Громкость родной дорожки ролика (0..1). */
   volume?: number
@@ -77,7 +93,7 @@ export class VideoOverlay {
       this.targetVolume = Math.min(1, Math.max(0, opts.volume ?? 0.35))
       this.video.muted = false
       this.video.volume = 0
-      this.video.src = `/video/${id}.mp4`
+      this.video.src = PRELOADED.get(id) ?? `/video/${id}.mp4`
       this.root.classList.add('video-overlay--on') // сначала тьма наплывает
       audio.beginVideoAmbience()
       // ролик стартует, когда экран уже тёмный, и сам проявляется за ~1с

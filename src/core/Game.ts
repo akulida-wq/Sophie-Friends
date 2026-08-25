@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+import { MAX_PIXEL_RATIO, SHADOWS_ENABLED } from './perf'
 import { GameStateMachine } from './GameState'
 import { createWorld } from './World'
 import { createSophiePlaceholder } from '../player/SophiePlaceholder'
@@ -20,10 +21,13 @@ export class Game {
   private updatables: Array<(dt: number, elapsed: number) => void> = []
 
   constructor(container: HTMLElement) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: 'high-performance',
+    })
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO))
     this.renderer.setSize(window.innerWidth, window.innerHeight)
-    this.renderer.shadowMap.enabled = true
+    this.renderer.shadowMap.enabled = SHADOWS_ENABLED
     this.renderer.shadowMap.type = THREE.PCFShadowMap
     container.appendChild(this.renderer.domElement)
 
