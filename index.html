@@ -409,11 +409,11 @@
         opacity: 1;
         pointer-events: auto;
       }
-      /* на весь экран; сам ролик проявляется из чёрного и в чёрный уходит */
+      /* на весь экран БЕЗ кропа (contain): поля — мягкая тьма оверлея */
       .video-overlay video {
         width: 100vw;
         height: 100vh;
-        object-fit: cover;
+        object-fit: contain;
         opacity: 0;
         transition: opacity 1s ease;
       }
