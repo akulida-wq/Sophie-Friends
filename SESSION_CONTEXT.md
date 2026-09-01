@@ -105,6 +105,9 @@ Stand_and_Chat УБРАН у всех — он разворачивает кор
 Проверка клипов: tools/blender/preview_friend_clips.py + контакт-листы
 (scratchpad sheet.py) — смотреть ВСЕ кадры клипа, не один.
 
+- DEVELOPERS.md в корне — тех-документация для разработчиков (стек,
+  конвейеры, грабли, портирование в Unity); обновлять при крупных сменах.
+
 ## Движок — что добавлено поверх фаз
 - Деплой: github.com/akulida-wq/Sophie-Friends (private, ветка main, SSH) →
   Vercel https://sophie-friends.vercel.app (авто-деплой на пуш; Vite/dist).
